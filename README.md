@@ -109,15 +109,15 @@ Make sure that your user is added to the `docker` user-group on _Unix_ systems, 
 #### Usage
 
 To run the parity client for the FuseNetwork you first have to pull the image from
-[DockerHub](https://hub.docker.com/r/fuse/fusenet).
+[DockerHub](https://hub.docker.com/r/fusenetwork/fusenet).
 
 It does not matter in which directory your are working this step, cause it will be added to _Docker_'s very own database.
 
 Afterwards calling the help should give a first basic overview how to use.
 
 ```
-$ docker pull fuse/fusenet
-$ docker run fuse/fusenet --help
+$ docker pull fusenetwork/fusenet
+$ docker run fusenetwork/fusenet --help
 
  NAME
    Parity Wrapper
@@ -205,7 +205,7 @@ $ mkdir -p ./config/keys/FuseNetwork
 $ cp /path/to/my/key ./config/keys/FuseNetwork/
 $ echo "mysupersecretpassphrase" > ./config/pass.pwd
 $ mkdir ./database
-$ docker run -ti -v $(pwd)/database:/data -v $(pwd)/config:/config/custom -p 30300:30300 fuse/fusenet --role participant --address MY_ADDRESS
+$ docker run -ti -v $(pwd)/database:/data -v $(pwd)/config:/config/custom -p 30300:30300 fusenetwork/fusenet --role participant --address MY_ADDRESS
 ```
 
 ##### Validator
@@ -216,7 +216,7 @@ As soon as you have set up the `config` folder with your account that is registe
 
 ```sh
 ...
-$ docker run -ti -v $(pwd)/database:/data -v $(pwd)/config:/config/custom -p 30300:30300 fuse/fusenet --role validator --address MY_ADDRESS
+$ docker run -ti -v $(pwd)/database:/data -v $(pwd)/config:/config/custom -p 30300:30300 fusenetwork/fusenet --role validator --address MY_ADDRESS
 ```
 
 #### Create New Account
@@ -231,7 +231,7 @@ Afterwards the key will be placed there and the first steps of these instruction
 
 ```sh
 $ mkdir ./config
-$ docker run -ti -v $(pwd)/config/:/config/custom fuse/fusenet --parity-args account new
+$ docker run -ti -v $(pwd)/config/:/config/custom fusenetwork/fusenet --parity-args account new
 ```
 
 _Parity_ will ask for a password, that should be stored by you into `./config/pass.pwd` afterwards.
@@ -325,6 +325,6 @@ If you want to provide an additional tag (e.g. for sub-versions), adjust the nam
 
 ```sh
 $ echo "yoursecretpassword" | docker login --username USERNAME --password-stdin
-$ docker tag LOCAL_IMAGE fuse/fusenet:latest
-$ docker push fuse/fusenet:latest
+$ docker tag LOCAL_IMAGE fusenetwork/fusenet:latest
+$ docker push fusenetwork/fusenet:latest
 ```

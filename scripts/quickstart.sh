@@ -3,7 +3,7 @@
 set -e
 
 # Variables
-DOCKER_IMAGE_PARITY="fuse/fusenet"
+DOCKER_IMAGE_PARITY="fusenetwork/fusenet"
 DOCKER_IMAGE_WATCHTOWER="v2tec/watchtower"
 DOCKER_CONTAINER_PARITY="fusnet"
 DOCKER_CONTAINER_WATCHTOWER="watchtower-testnet"
