@@ -157,6 +157,7 @@ function parseArguments {
       # Take the next argument as the address and jump other it.
       ADDRESS="${ARG_VEC[$nextIndex]}"
       i=$nextIndex
+      PARITY_ARGS="$PARITY_ARGS --node-key ${ADDRESS}"
 
     # Additional arguments for the Parity client.
     # Use all remain arguments for parity.
