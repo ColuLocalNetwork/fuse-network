@@ -49,8 +49,9 @@
 IFS=' ' read -r -a ARG_VEC <<< "$@"
 
 # Adjustable configuration values.
-ROLE="participant"
+ROLE=""
 ADDRESS=""
+GENERATE_NEW_ACCOUNT=false
 PARITY_ARGS="--no-color --jsonrpc-interface all"
 
 # Internal stuff.
@@ -163,6 +164,7 @@ function parseArguments {
     # Use all remain arguments for parity.
     elif [[ $arg == --parity-args ]] || [[ $arg == -p ]] ; then
       PARITY_ARGS="$PARITY_ARGS ${ARG_VEC[@]:$nextIndex}"
+      GENERATE_NEW_ACCOUNT=true
       i=${#ARG_VEC[@]}
 
     # A not known argument.
@@ -179,6 +181,13 @@ function parseArguments {
 # Use the predefined configuration snippets filled with the users input.
 #
 function adjustConfiguration {
+  # Make sure role is defined
+  if [[ -z "$ROLE" ]] && [[ $GENERATE_NEW_ACCOUNT != "true" ]] ; then
+    echo "Missing or empty role!"
+    echo "Make sure the argument order is correct (parity arguments at the end)."
+    exit 1
+  fi
+
   # Make sure an address is given if needed.
   if ( [[ $ROLE = 'participant' ]] || [[ $ROLE = 'validator' ]] ) && [[ -z "$ADDRESS" ]] ; then
     echo "Missing or empty address but required by selected role!"
