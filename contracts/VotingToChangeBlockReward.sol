@@ -1,9 +1,9 @@
 pragma solidity ^0.4.24;
 
-import "./BasicVoting.sol";
+import "./Voting.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract VotingToChangeReward is BasicVoting {
+contract VotingToChangeBlockReward is Voting {
 
   // function initialize(uint256 _minBallotDuration, uint256 _minPossibleThreshold) public {
 

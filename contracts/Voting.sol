@@ -1,14 +1,12 @@
 pragma solidity ^0.4.24;
 
-import "./abstracts/Voting.sol";
+import "./abstracts/VotingBase.sol";
+import "./abstracts/VotingEnums.sol";
 import "./VotingStorage.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract BasicVoting is VotingStorage, Voting {
+contract Voting is VotingStorage, VotingBase, VotingEnums {
   using SafeMath for uint256;
-
-  enum QuorumStates {Invalid, InProgress, Accepted, Rejected}
-  enum ActionChoice {Invalid, Accept, Reject}
 
   modifier onlyValidTime(uint256 _startTime, uint256 _endTime) {
     require(_startTime > 0 && _endTime > 0);
@@ -62,11 +60,15 @@ contract BasicVoting is VotingStorage, Voting {
   }
 
   function finalize(uint256 _id) external onlyValidVotingKey(msg.sender) {
-    require(canBeFinalizedNow(_id));
+    require(canBeFinalizedInner(_id));
     finalizeBallot(_id);
   }
 
-  function canBeFinalizedNow(uint256 _id) public view returns(bool) {
+  function canBeFinalized(uint256 _id) public view returns(bool) {
+    return canBeFinalizedInner(_id);
+  }
+
+  function canBeFinalizedInner(uint256 _id) internal view returns(bool) {
     uint256 currentTime = getTime();
     uint256 startTime = getStartTime(_id);
 

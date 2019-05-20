@@ -1,6 +1,6 @@
 require('dotenv').config()
 const Consensus = artifacts.require('./Consensus.sol')
-const Reward = artifacts.require('./Reward.sol')
+const BlockReward = artifacts.require('./BlockReward.sol')
 const EternalStorageProxy = artifacts.require('./upgradeability/EternalStorageProxy.sol')
 const {toBN, toWei} = web3.utils
 
@@ -17,13 +17,13 @@ module.exports = function(deployer, network, accounts) {
   if (network !== 'test') {
     let initialValidatorAddress = INITIAL_VALIDATOR_ADDRESS || ZERO_ADDRESS
     let minStake = toWei(toBN(MIN_STAKE_GWEI || 0), 'gwei')
-    let blockReward = toWei(toBN(BLOCK_REWARD_GWEI || 0), 'gwei')
+    let blockRewardAmount = toWei(toBN(BLOCK_REWARD_GWEI || 0), 'gwei')
 
     let owner = accounts[0]
 
     let proxy
     let consensusImpl, consenus
-    let rewardImpl, reward
+    let blockRewardImp, blockReward
 
     deployer.then(async function() {
       consensusImpl = await Consensus.new()
@@ -32,16 +32,16 @@ module.exports = function(deployer, network, accounts) {
       consensus = await Consensus.at(proxy.address)
       await consensus.initialize(minStake, initialValidatorAddress, owner)
 
-      rewardImpl = await Reward.new()
+      blockRewardImp = await BlockReward.new()
       proxy = await EternalStorageProxy.new()
-      await proxy.methods['upgradeTo(uint256,address)']('1', rewardImpl.address)
-      reward = await Reward.at(proxy.address)
-      await reward.initialize(blockReward, owner)
+      await proxy.methods['upgradeTo(uint256,address)']('1', blockRewardImp.address)
+      blockReward = await BlockReward.at(proxy.address)
+      await blockReward.initialize(blockRewardAmount, owner)
 
-      console.log(`Consensus Implementation ........................ ${consensusImpl.address}`)
-      console.log(`Consensus Proxy          ........................ ${consensus.address}`)
-      console.log(`Reward Implementation    ........................ ${rewardImpl.address}`)
-      console.log(`Reward Proxy             ........................ ${reward.address}`)
+      console.log(`Consensus Implementation     .................... ${consensusImpl.address}`)
+      console.log(`Consensus Proxy              .................... ${consensus.address}`)
+      console.log(`Block Reward Implementation  .................... ${blockRewardImp.address}`)
+      console.log(`Block Reward Proxy           .................... ${blockReward.address}`)
     }).catch(function(error) {
       console.error(error)
     })

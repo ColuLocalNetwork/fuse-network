@@ -1,9 +1,10 @@
 pragma solidity ^0.4.24;
 
+import "./abstracts/ValidatorSet.sol";
 import "./ConsensusStorage.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract Consensus is ConsensusStorage {
+contract Consensus is ConsensusStorage, ValidatorSet {
   using SafeMath for uint256;
 
   event ChangeFinalized(address[] newSet);

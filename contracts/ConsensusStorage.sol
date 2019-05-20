@@ -2,10 +2,9 @@ pragma solidity ^0.4.24;
 
 import "./upgradeability/EternalStorage.sol";
 import "./upgradeability/EternalOwnable.sol";
-import "./abstracts/ValidatorSet.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract ConsensusStorage is EternalStorage, EternalOwnable, ValidatorSet {
+contract ConsensusStorage is EternalStorage, EternalOwnable {
     using SafeMath for uint256;
 
     function getConsensusVersion() public pure returns(uint64 major, uint64 minor, uint64 patch) {
