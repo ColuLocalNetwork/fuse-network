@@ -1,8 +1,8 @@
 pragma solidity ^0.4.24;
 
 import "./upgradeability/EternalStorage.sol";
-import "./EternalOwnable.sol";
-import "./ValidatorSet.sol";
+import "./upgradeability/EternalOwnable.sol";
+import "./abstracts/ValidatorSet.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract BasicConsensus is EternalStorage, EternalOwnable, ValidatorSet {

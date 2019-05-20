@@ -1,8 +1,8 @@
 pragma solidity ^0.4.24;
 
 import "./upgradeability/EternalStorage.sol";
-import "./EternalOwnable.sol";
-import "./BlockReward.sol";
+import "./upgradeability/EternalOwnable.sol";
+import "./abstracts/BlockReward.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract BasicBlockReward is EternalStorage, EternalOwnable, BlockReward {

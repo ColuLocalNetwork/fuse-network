@@ -1,6 +1,6 @@
 pragma solidity ^0.4.24;
 
-import "./upgradeability/EternalStorage.sol";
+import "./EternalStorage.sol";
 
 
 /**
