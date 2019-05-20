@@ -5,7 +5,7 @@ import "./upgradeability/EternalOwnable.sol";
 import "./abstracts/BlockReward.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract BasicBlockReward is EternalStorage, EternalOwnable, BlockReward {
+contract BlockRewardStorage is EternalStorage, EternalOwnable, BlockReward {
     using SafeMath for uint256;
 
     function getBlockRewardVersion() public pure returns(uint64 major, uint64 minor, uint64 patch) {

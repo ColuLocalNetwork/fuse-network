@@ -1,9 +1,9 @@
 pragma solidity ^0.4.24;
 
-import "./BasicBlockReward.sol";
+import "./BlockRewardStorage.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract Reward is BasicBlockReward {
+contract Reward is BlockRewardStorage {
   using SafeMath for uint256;
 
   event Rewarded(address[] receivers, uint256[] rewards);

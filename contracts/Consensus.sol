@@ -1,9 +1,9 @@
 pragma solidity ^0.4.24;
 
-import "./BasicConsensus.sol";
+import "./ConsensusStorage.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract Consensus is BasicConsensus {
+contract Consensus is ConsensusStorage {
   using SafeMath for uint256;
 
   event ChangeFinalized(address[] newSet);

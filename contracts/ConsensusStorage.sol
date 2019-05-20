@@ -5,7 +5,7 @@ import "./upgradeability/EternalOwnable.sol";
 import "./abstracts/ValidatorSet.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract BasicConsensus is EternalStorage, EternalOwnable, ValidatorSet {
+contract ConsensusStorage is EternalStorage, EternalOwnable, ValidatorSet {
     using SafeMath for uint256;
 
     function getConsensusVersion() public pure returns(uint64 major, uint64 minor, uint64 patch) {
