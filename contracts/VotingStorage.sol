@@ -1,10 +1,12 @@
 pragma solidity ^0.4.24;
 
+import "./abstracts/ThresholdTypesEnum.sol";
 import "./eternal-storage/EternalStorage.sol";
 import "./eternal-storage/EternalOwnable.sol";
+import "./BallotsStorage.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract VotingStorage is EternalStorage, EternalOwnable {
+contract VotingStorage is EternalStorage, EternalOwnable, ThresholdTypesEnum {
   using SafeMath for uint256;
 
   function getTime() public view returns(uint256) {
@@ -181,16 +183,16 @@ contract VotingStorage is EternalStorage, EternalOwnable {
     return addressStorage[keccak256(abi.encodePacked("proxyStorage"))];
   }
 
-  // TODO implement
-  function getBallotLimitPerValidator() internal view returns(uint256) {
-    // return getBallotsStorage().getBallotLimitPerValidator();
-    return 5;
+  function getBallotsStorage() internal view returns(BallotsStorage) {
+    return BallotsStorage(ProxyStorage(getProxyStorage()).getBallotsStorage());
   }
 
-  // TODO implement
+  function getBallotLimitPerValidator() internal view returns(uint256) {
+    return getBallotsStorage().getBallotLimitPerValidator();
+  }
+
   function getGlobalMinThresholdOfVoters() internal view returns(uint256) {
-    // return getBallotsStorage().getBallotThreshold(uint256(ThresholdTypes.Keys));
-    return 3;
+    return getBallotsStorage().getBallotThreshold(uint256(ThresholdTypes.Keys));
   }
 
   function votersAdd(uint256 _id, address _key) internal {
