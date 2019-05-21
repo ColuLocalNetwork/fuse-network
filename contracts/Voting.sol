@@ -26,7 +26,7 @@ contract Voting is VotingStorage, VotingBase, VotingEnums {
     _;
   }
 
-  function initialize(uint256 _minBallotDuration) internal onlyOwner {
+  function init(uint256 _minBallotDuration) internal {
     require(!isInitialized());
     require(_minBallotDuration < getMaxBallotDuration());
     setMinBallotDuration(_minBallotDuration);

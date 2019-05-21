@@ -16,9 +16,12 @@ contract BlockReward is BlockRewardStorage, BlockRewardBase {
 
   function initialize(uint256 _reward, address _owner) public returns(bool) {
     require(!isInitialized());
-    require(_owner != address(0));
+    if(_owner != address(0)) {
+      setOwner(_owner);
+    } else {
+      setOwner(msg.sender);
+    }
     setSystemAddress();
-    setOwner(_owner);
     setReward(_reward);
     setInitialized(true);
     return isInitialized();

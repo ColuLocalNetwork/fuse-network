@@ -36,12 +36,18 @@ contract ProxyStorage is EternalStorage, EternalOwnable {
     _;
   }
 
-  function initialize(address _consensus) public onlyOwner {
+  function initialize(address _consensus, address _owner) public returns(bool) {
     require(!isInitialized());
     require(_consensus != address(0));
     require(_consensus != address(this));
+    if(_owner != address(0)) {
+      setOwner(_owner);
+    } else {
+      setOwner(msg.sender);
+    }
     setConsensus(_consensus);
     setInitialized(true);
+    return isInitialized();
   }
 
   function initializeAddresses(address _blockReward, address _ballotsStorage, address _votingToChangeBlockReward, address _votingToChangeMinStake, address _votingToChangeMinThreshold, address _votingToChangeProxy) public onlyOwner {

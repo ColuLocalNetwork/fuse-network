@@ -21,9 +21,13 @@ contract Consensus is ConsensusStorage, ValidatorSet {
 
   function initialize(uint256 _minStake, address _initialValidator, address _owner) public returns(bool){
     require(!isInitialized());
-    require(_owner != address(0));
+    require(_initialValidator != address(0) || _owner != address(0));
     setSystemAddress();
-    setOwner(_owner);
+    if(_owner != address(0)) {
+      setOwner(_owner);
+    } else {
+      setOwner(msg.sender);
+    }
     setMinStake(_minStake);
     if (_initialValidator == address(0)) {
       currentValidatorsAdd(_owner);

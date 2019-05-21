@@ -7,7 +7,7 @@ contract VotingToChangeMinThreshold is Voting {
 
     function initialize(uint256 _minBallotDuration, uint256 _minPossibleThreshold) public {
       require(_minPossibleThreshold > 0);
-      initialize(_minBallotDuration);
+      init(_minBallotDuration);
       setMinPossibleThreshold(_minPossibleThreshold);
     }
 

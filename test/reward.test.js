@@ -9,6 +9,7 @@ const SYSTEM_ADDRESS = '0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE'
 
 contract('BlockReward', async (accounts) => {
   let blockRewardImpl, proxy, blockReward
+  let sender = accounts[0]
   let owner = accounts[0]
   let nonOwner = accounts[1]
   let mockSystemAddress = accounts[2]
@@ -25,8 +26,11 @@ contract('BlockReward', async (accounts) => {
       REWARD.should.be.bignumber.equal(await blockReward.getReward())
       owner.should.equal(await blockReward.owner())
     })
-    it('owner address not defined', async () => {
-      await blockReward.initialize(REWARD, ZERO_ADDRESS).should.be.rejectedWith(ERROR_MSG)
+    it('owner address not defined - msg.sender should be owner', async () => {
+      await blockReward.initialize(REWARD, ZERO_ADDRESS)
+      toChecksumAddress(SYSTEM_ADDRESS).should.be.equal(toChecksumAddress(await blockReward.systemAddress()))
+      REWARD.should.be.bignumber.equal(await blockReward.getReward())
+      sender.should.equal(await blockReward.owner())
     })
     it('only owner can set reward', async () => {
       await blockReward.initialize(REWARD, owner)

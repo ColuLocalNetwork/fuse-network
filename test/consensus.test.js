@@ -14,6 +14,7 @@ const SYSTEM_ADDRESS = '0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE'
 
 contract('Consensus', async (accounts) => {
   let consensusImpl, proxy, consensus
+  let sender = accounts[0]
   let owner = accounts[0]
   let nonOwner = accounts[1]
   let initialValidator = accounts[0]
@@ -38,8 +39,17 @@ contract('Consensus', async (accounts) => {
       let pendingValidators = await consensus.getPendingValidators()
       pendingValidators.length.should.be.equal(0)
     })
-    it('owner address not defined', async () => {
-      await consensus.initialize(MIN_STAKE, initialValidator, ZERO_ADDRESS).should.be.rejectedWith(ERROR_MSG)
+    it('owner address not defined - msg.sender should be owner', async () => {
+      await consensus.initialize(MIN_STAKE, initialValidator, ZERO_ADDRESS)
+      toChecksumAddress(SYSTEM_ADDRESS).should.be.equal(toChecksumAddress(await consensus.systemAddress()))
+      false.should.be.equal(await consensus.isFinalized())
+      MIN_STAKE.should.be.bignumber.equal(await consensus.minStake())
+      sender.should.equal(await consensus.owner())
+      let validators = await consensus.getValidators()
+      validators.length.should.be.equal(1)
+      validators[0].should.be.equal(initialValidator)
+      let pendingValidators = await consensus.getPendingValidators()
+      pendingValidators.length.should.be.equal(0)
     })
     it('initial validator address not defined - owner should be initial validator', async () => {
       await consensus.initialize(MIN_STAKE, ZERO_ADDRESS, owner)

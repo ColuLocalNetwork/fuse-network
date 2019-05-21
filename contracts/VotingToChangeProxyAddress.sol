@@ -3,10 +3,9 @@ pragma solidity ^0.4.24;
 import "./Voting.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract VotingToChangeMinStake is Voting {
+contract VotingToChangeProxyAddress is Voting {
 
-  function initialize(uint256 _minBallotDuration, uint256 _minPossibleThreshold) public {
-    require(_minPossibleThreshold > 0);
+  function initialize(uint256 _minBallotDuration) public {
     init(_minBallotDuration);
   }
 
