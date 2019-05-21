@@ -1,15 +1,11 @@
 pragma solidity ^0.4.24;
 
-import "./upgradeability/EternalStorage.sol";
-import "./upgradeability/EternalOwnable.sol";
+import "./eternal-storage/EternalStorage.sol";
+import "./eternal-storage/EternalOwnable.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract BlockRewardStorage is EternalStorage, EternalOwnable {
     using SafeMath for uint256;
-
-    function getBlockRewardVersion() public pure returns(uint64 major, uint64 minor, uint64 patch) {
-      return (0, 0, 1);
-    }
 
     function systemAddress() public view returns(address) {
       return addressStorage[keccak256(abi.encodePacked("SYSTEM_ADDRESS"))];

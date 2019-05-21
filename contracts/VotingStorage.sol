@@ -1,15 +1,11 @@
 pragma solidity ^0.4.24;
 
-import "./upgradeability/EternalStorage.sol";
-import "./upgradeability/EternalOwnable.sol";
+import "./eternal-storage/EternalStorage.sol";
+import "./eternal-storage/EternalOwnable.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract VotingStorage is EternalStorage, EternalOwnable {
   using SafeMath for uint256;
-
-  function getVotingVersion() public pure returns(uint64 major, uint64 minor, uint64 patch) {
-    return (0, 0, 1);
-  }
 
   function getTime() public view returns(uint256) {
     return now;
@@ -179,6 +175,10 @@ contract VotingStorage is EternalStorage, EternalOwnable {
 
   function setFinalizeCalled(uint256 _id) internal {
     boolStorage[keccak256(abi.encodePacked("finalizeCalled", _id))] = true;
+  }
+
+  function getProxyStorage() internal view returns(address) {
+    return addressStorage[keccak256(abi.encodePacked("proxyStorage"))];
   }
 
   // TODO implement

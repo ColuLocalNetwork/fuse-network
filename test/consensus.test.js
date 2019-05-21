@@ -23,8 +23,7 @@ contract('Consensus', async (accounts) => {
   describe('initialize', async () => {
     beforeEach(async () => {
       consensusImpl = await Consensus.new()
-      proxy = await EternalStorageProxy.new()
-      await proxy.methods['upgradeTo(uint256,address)']('1', consensusImpl.address)
+      proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
       consensus = await Consensus.at(proxy.address)
     })
     it('default values', async () => {
@@ -77,8 +76,7 @@ contract('Consensus', async (accounts) => {
   describe('finalizeChange', async () => {
     beforeEach(async () => {
       consensusImpl = await Consensus.new()
-      proxy = await EternalStorageProxy.new()
-      await proxy.methods['upgradeTo(uint256,address)']('1', consensusImpl.address)
+      proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
       consensus = await Consensus.at(proxy.address)
       await consensus.initialize(MIN_STAKE, initialValidator, owner)
     })
@@ -97,8 +95,7 @@ contract('Consensus', async (accounts) => {
   describe('stake using payable', async () => {
     beforeEach(async () => {
       consensusImpl = await Consensus.new()
-      proxy = await EternalStorageProxy.new()
-      await proxy.methods['upgradeTo(uint256,address)']('1', consensusImpl.address)
+      proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
       consensus = await Consensus.at(proxy.address)
       await consensus.initialize(MIN_STAKE, initialValidator, owner)
     })
@@ -336,8 +333,7 @@ contract('Consensus', async (accounts) => {
   describe('withdraw', async () => {
     beforeEach(async () => {
       consensusImpl = await Consensus.new()
-      proxy = await EternalStorageProxy.new()
-      await proxy.methods['upgradeTo(uint256,address)']('1', consensusImpl.address)
+      proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
       consensus = await Consensus.at(proxy.address)
       await consensus.initialize(MIN_STAKE, initialValidator, owner)
     })

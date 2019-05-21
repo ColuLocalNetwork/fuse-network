@@ -23,25 +23,23 @@ module.exports = function(deployer, network, accounts) {
 
     let proxy
     let consensusImpl, consenus
-    let blockRewardImp, blockReward
+    let blockRewardImpl, blockReward
 
     deployer.then(async function() {
       consensusImpl = await Consensus.new()
-      proxy = await EternalStorageProxy.new()
-      await proxy.methods['upgradeTo(uint256,address)']('1', consensusImpl.address)
+      proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
       consensus = await Consensus.at(proxy.address)
       await consensus.initialize(minStake, initialValidatorAddress, owner)
 
-      blockRewardImp = await BlockReward.new()
-      proxy = await EternalStorageProxy.new()
-      await proxy.methods['upgradeTo(uint256,address)']('1', blockRewardImp.address)
+      blockRewardImpl = await BlockReward.new()
+      proxy = await EternalStorageProxy.new(ZERO_ADDRESS, blockRewardImpl.address)
       blockReward = await BlockReward.at(proxy.address)
       await blockReward.initialize(blockRewardAmount, owner)
 
-      console.log(`Consensus Implementation     .................... ${consensusImpl.address}`)
-      console.log(`Consensus Proxy              .................... ${consensus.address}`)
-      console.log(`Block Reward Implementation  .................... ${blockRewardImp.address}`)
-      console.log(`Block Reward Proxy           .................... ${blockReward.address}`)
+      console.log(`Consensus Implementation ....................... ${consensusImpl.address}`)
+      console.log(`Consensus Storage .............................. ${consensus.address}`)
+      console.log(`Block Reward Implementation .................... ${blockRewardImpl.address}`)
+      console.log(`Block Reward Storage ........................... ${blockReward.address}`)
     }).catch(function(error) {
       console.error(error)
     })

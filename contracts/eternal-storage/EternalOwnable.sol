@@ -2,7 +2,6 @@ pragma solidity ^0.4.24;
 
 import "./EternalStorage.sol";
 
-
 /**
  * @title EternalOwnable
  * @dev This contract has an owner address providing basic authorization control

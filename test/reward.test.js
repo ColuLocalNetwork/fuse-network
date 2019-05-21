@@ -16,8 +16,7 @@ contract('BlockReward', async (accounts) => {
   describe('initialize', async () => {
     beforeEach(async () => {
       blockRewardImpl = await BlockReward.new()
-      proxy = await EternalStorageProxy.new()
-      await proxy.methods['upgradeTo(uint256,address)']('1', blockRewardImpl.address)
+      proxy = await EternalStorageProxy.new(ZERO_ADDRESS, blockRewardImpl.address)
       blockReward = await BlockReward.at(proxy.address)
     })
     it('default values', async () => {
@@ -46,8 +45,7 @@ contract('BlockReward', async (accounts) => {
   describe('reward', async () => {
     beforeEach(async () => {
       blockRewardImpl = await BlockReward.new()
-      proxy = await EternalStorageProxy.new()
-      await proxy.methods['upgradeTo(uint256,address)']('1', blockRewardImpl.address)
+      proxy = await EternalStorageProxy.new(ZERO_ADDRESS, blockRewardImpl.address)
       blockReward = await BlockReward.at(proxy.address)
       await blockReward.initialize(REWARD, owner)
     })

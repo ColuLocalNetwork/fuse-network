@@ -3,6 +3,8 @@ pragma solidity ^0.4.24;
 import "./abstracts/VotingBase.sol";
 import "./abstracts/VotingEnums.sol";
 import "./VotingStorage.sol";
+import "./ProxyStorage.sol";
+import "./Consensus.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract Voting is VotingStorage, VotingBase, VotingEnums {
@@ -19,12 +21,13 @@ contract Voting is VotingStorage, VotingBase, VotingEnums {
 
   // TODO implement
   modifier onlyValidVotingKey(address _votingKey) {
-    // require(_getKeysManager().isVotingActive(_votingKey));
+    // require(getKeysManager().isVotingActive(_votingKey));
     require(true);
     _;
   }
 
   function initialize(uint256 _minBallotDuration) internal onlyOwner {
+    require(!isInitialized());
     require(_minBallotDuration < getMaxBallotDuration());
     setMinBallotDuration(_minBallotDuration);
     setInitialized(true);
@@ -76,16 +79,15 @@ contract Voting is VotingStorage, VotingBase, VotingEnums {
     if (startTime > currentTime) return false;
     if (getIsFinalized(_id)) return false;
 
-    // TODO implement
-    // uint256 validatorsLength = IPoaNetworkConsensus(IProxyStorage(proxyStorage()).getPoaConsensus()).getCurrentValidatorsLengthWithoutMoC();
+    uint256 validatorsLength = Consensus(ProxyStorage(getProxyStorage()).getConsensus()).currentValidatorsLength();
 
-    // if (validatorsLength == 0) {
-    //   return false;
-    // }
+    if (validatorsLength == 0) {
+      return false;
+    }
 
-    // if (getTotalVoters(_id) < validatorsLength) {
-    //   return !isActive(_id);
-    // }
+    if (getTotalVoters(_id) < validatorsLength) {
+      return !isActiveBallot(_id);
+    }
 
     uint256 diffTime = currentTime.sub(startTime);
     return diffTime > getMinBallotDuration();
