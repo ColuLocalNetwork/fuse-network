@@ -52,6 +52,10 @@ contract ConsensusStorage is EternalStorage {
       return addressArrayStorage[keccak256(abi.encodePacked("currentValidators"))].length;
     }
 
+    function currentValidatorsAtPosition(uint256 _p) public view returns(address) {
+      return addressArrayStorage[keccak256(abi.encodePacked("currentValidators"))][_p];
+    }
+
     function currentValidatorsAdd(address _address) internal {
         addressArrayStorage[keccak256(abi.encodePacked("currentValidators"))].push(_address);
     }
@@ -148,5 +152,16 @@ contract ConsensusStorage is EternalStorage {
 
     function setValidatorIndexes(address _address, uint256[] _indexes) internal {
       uintArrayStorage[keccak256(abi.encodePacked("validatorIndexes", _address))] = _indexes;
+    }
+
+    function getProxyStorage() internal view returns(address) {
+      return addressStorage[keccak256(abi.encodePacked("proxyStorage"))];
+    }
+
+    function setProxyStorage(address _newAddress) public onlyOwner {
+      require(!boolStorage[keccak256(abi.encodePacked("wasProxyStorageSet"))]);
+      require(_newAddress != address(0));
+      addressStorage[keccak256(abi.encodePacked("proxyStorage"))] = _newAddress;
+      boolStorage[keccak256(abi.encodePacked("wasProxyStorageSet"))] = true;
     }
 }

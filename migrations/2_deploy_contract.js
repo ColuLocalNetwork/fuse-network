@@ -19,6 +19,7 @@ const {
   INITIAL_VALIDATOR_ADDRESS,
   MIN_STAKE_GWEI,
   BLOCK_REWARD_GWEI,
+  BALLOT_THRESHOLDS,
   MIN_BALLOT_DURATION_SECONDS,
   MIN_POSSIBLE_THRESHOLD,
   SAVE_TO_FILE
@@ -29,6 +30,7 @@ module.exports = function(deployer, network, accounts) {
     let initialValidatorAddress = INITIAL_VALIDATOR_ADDRESS || ZERO_ADDRESS
     let minStake = toWei(toBN(MIN_STAKE_GWEI || 0), 'gwei')
     let blockRewardAmount = toWei(toBN(BLOCK_REWARD_GWEI || 0), 'gwei')
+    let ballotsThresholds = BALLOT_THRESHOLDS ? BALLOT_THRESHOLDS.split(',') : [3]
     let minBallotDuration = MIN_BALLOT_DURATION_SECONDS || 172800
     let minPossibleThreshold = MIN_POSSIBLE_THRESHOLD || 3
 
@@ -54,13 +56,13 @@ module.exports = function(deployer, network, accounts) {
       proxy = await EternalStorageProxy.new(ZERO_ADDRESS, proxyStorageImpl.address)
       proxyStorage = await ProxyStorage.at(proxy.address)
       await proxyStorage.initialize(consensus.address)
-      // await consensus.setProxyStorage(proxyStorage.address) // TODO implement
+      await consensus.setProxyStorage(proxyStorage.address)
 
       // BallotsStorage
       ballotsStorageImpl = await BallotsStorage.new()
       proxy = await EternalStorageProxy.new(proxyStorage.address, ballotsStorageImpl.address)
       ballotsStorage = await BallotsStorage.at(proxy.address)
-      ballotsStorage.initialize([3])
+      ballotsStorage.initialize(ballotsThresholds)
 
       // BlockReward
       blockRewardImpl = await BlockReward.new()

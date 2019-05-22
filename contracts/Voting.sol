@@ -19,10 +19,8 @@ contract Voting is VotingStorage, VotingBase, VotingEnums {
     _;
   }
 
-  // TODO implement
-  modifier onlyValidVotingKey(address _votingKey) {
-    // require(getKeysManager().isVotingActive(_votingKey));
-    require(true);
+  modifier onlyValidVotingKey(address _address) {
+    require (isValidVotingKey(_address));
     _;
   }
 
@@ -31,6 +29,18 @@ contract Voting is VotingStorage, VotingBase, VotingEnums {
     require(_minBallotDuration < getMaxBallotDuration());
     setMinBallotDuration(_minBallotDuration);
     setInitialized(true);
+  }
+
+  function isValidVotingKey(address _address) public view returns(bool) {
+    bool valid = false;
+    Consensus consensus = Consensus(ProxyStorage(getProxyStorage()).getConsensus());
+    for (uint256 i = 0; i < consensus.currentValidatorsLength(); i++) {
+      address validator = consensus.currentValidatorsAtPosition(i);
+      if (validator == _address) {
+        valid = true;
+      }
+    }
+    return valid;
   }
 
   function createBallot(uint256 _ballotType, uint256 _startTime, uint256 _endTime, string _description) internal onlyValidVotingKey(msg.sender) onlyValidTime(_startTime, _endTime) returns(uint256) {
