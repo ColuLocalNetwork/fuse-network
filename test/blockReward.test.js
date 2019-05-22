@@ -93,7 +93,7 @@ contract('BlockReward', async (accounts) => {
 
   describe('upgradeTo', async () => {
     let blockRewardOldImplementation, blockRewardNew
-    let proxyStorageStub = accounts[6]
+    let proxyStorageStub = accounts[3]
     beforeEach(async () => {
       blockReward = await BlockReward.new()
       blockRewardOldImplementation = blockReward.address
@@ -139,7 +139,6 @@ contract('BlockReward', async (accounts) => {
       proxyStorageStub.should.be.equal(await blockRewardNew.getProxyStorage())
     })
     it('should use same storage after upgrade', async () => {
-      let newValue = 5
       await blockReward.setReward(REWARD_OTHER, {from: owner})
       await proxy.setProxyStorageMock(proxyStorageStub)
       await proxy.upgradeTo(blockRewardNew.address, {from: proxyStorageStub})
