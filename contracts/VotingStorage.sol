@@ -2,11 +2,10 @@ pragma solidity ^0.4.24;
 
 import "./abstracts/ThresholdTypesEnum.sol";
 import "./eternal-storage/EternalStorage.sol";
-import "./eternal-storage/EternalOwnable.sol";
 import "./BallotsStorage.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract VotingStorage is EternalStorage, EternalOwnable, ThresholdTypesEnum {
+contract VotingStorage is EternalStorage, ThresholdTypesEnum {
   using SafeMath for uint256;
 
   function getTime() public view returns(uint256) {

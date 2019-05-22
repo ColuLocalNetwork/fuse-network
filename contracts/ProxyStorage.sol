@@ -2,10 +2,9 @@ pragma solidity ^0.4.24;
 
 import "./eternal-storage/EternalStorageProxy.sol";
 import "./eternal-storage/EternalStorage.sol";
-import "./eternal-storage/EternalOwnable.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract ProxyStorage is EternalStorage, EternalOwnable {
+contract ProxyStorage is EternalStorage {
   using SafeMath for uint256;
 
   enum ContractTypes {
@@ -31,20 +30,20 @@ contract ProxyStorage is EternalStorage, EternalOwnable {
 
   event AddressSet(uint256 contractType, address contractAddress);
 
+  modifier onlyOwner() {
+    require(msg.sender == addressStorage[keccak256(abi.encodePacked("owner"))]);
+    _;
+  }
+
   modifier onlyVotingToChangeProxy() {
     require(msg.sender == getVotingToChangeProxy());
     _;
   }
 
-  function initialize(address _consensus, address _owner) public returns(bool) {
+  function initialize(address _consensus) public onlyOwner returns(bool) {
     require(!isInitialized());
     require(_consensus != address(0));
     require(_consensus != address(this));
-    if(_owner != address(0)) {
-      setOwner(_owner);
-    } else {
-      setOwner(msg.sender);
-    }
     setConsensus(_consensus);
     setInitialized(true);
     return isInitialized();
@@ -95,10 +94,6 @@ contract ProxyStorage is EternalStorage, EternalOwnable {
         emit AddressSet(_contractType, _contractAddress);
     }
     return success;
-  }
-
-  function isOwner(address _address) private view returns(bool) {
-    return _address == owner();
   }
 
   function setInitialized(bool _value) internal {

@@ -9,7 +9,6 @@ const SYSTEM_ADDRESS = '0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE'
 
 contract('BlockReward', async (accounts) => {
   let blockRewardImpl, proxy, blockReward
-  let sender = accounts[0]
   let owner = accounts[0]
   let nonOwner = accounts[1]
   let mockSystemAddress = accounts[2]
@@ -18,29 +17,23 @@ contract('BlockReward', async (accounts) => {
     beforeEach(async () => {
       blockRewardImpl = await BlockReward.new()
       proxy = await EternalStorageProxy.new(ZERO_ADDRESS, blockRewardImpl.address)
+      owner.should.equal(await proxy.getOwner())
       blockReward = await BlockReward.at(proxy.address)
     })
     it('default values', async () => {
-      await blockReward.initialize(REWARD, owner)
+      await blockReward.initialize(REWARD)
       toChecksumAddress(SYSTEM_ADDRESS).should.be.equal(toChecksumAddress(await blockReward.systemAddress()))
       REWARD.should.be.bignumber.equal(await blockReward.getReward())
-      owner.should.equal(await blockReward.owner())
-    })
-    it('owner address not defined - msg.sender should be owner', async () => {
-      await blockReward.initialize(REWARD, ZERO_ADDRESS)
-      toChecksumAddress(SYSTEM_ADDRESS).should.be.equal(toChecksumAddress(await blockReward.systemAddress()))
-      REWARD.should.be.bignumber.equal(await blockReward.getReward())
-      sender.should.equal(await blockReward.owner())
     })
     it('only owner can set reward', async () => {
-      await blockReward.initialize(REWARD, owner)
+      await blockReward.initialize(REWARD)
       await blockReward.setReward(REWARD_OTHER, {from: nonOwner}).should.be.rejectedWith(ERROR_MSG)
       REWARD.should.be.bignumber.equal(await blockReward.getReward())
       await blockReward.setReward(REWARD_OTHER, {from: owner})
       REWARD_OTHER.should.be.bignumber.equal(await blockReward.getReward())
     })
     it('can set zero reward', async () => {
-      await blockReward.initialize(REWARD, owner)
+      await blockReward.initialize(REWARD)
       await blockReward.setReward(ZERO_AMOUNT, {from: owner})
       ZERO_AMOUNT.should.be.bignumber.equal(await blockReward.getReward())
     })
@@ -51,7 +44,7 @@ contract('BlockReward', async (accounts) => {
       blockRewardImpl = await BlockReward.new()
       proxy = await EternalStorageProxy.new(ZERO_ADDRESS, blockRewardImpl.address)
       blockReward = await BlockReward.at(proxy.address)
-      await blockReward.initialize(REWARD, owner)
+      await blockReward.initialize(REWARD)
     })
     it('can only be called by system address', async () => {
       await blockReward.reward([accounts[3]], [0]).should.be.rejectedWith(ERROR_MSG)

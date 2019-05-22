@@ -14,7 +14,6 @@ const SYSTEM_ADDRESS = '0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE'
 
 contract('Consensus', async (accounts) => {
   let consensusImpl, proxy, consensus
-  let sender = accounts[0]
   let owner = accounts[0]
   let nonOwner = accounts[1]
   let initialValidator = accounts[0]
@@ -25,26 +24,14 @@ contract('Consensus', async (accounts) => {
     beforeEach(async () => {
       consensusImpl = await Consensus.new()
       proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
+      owner.should.equal(await proxy.getOwner())
       consensus = await Consensus.at(proxy.address)
     })
     it('default values', async () => {
-      await consensus.initialize(MIN_STAKE, initialValidator, owner)
+      await consensus.initialize(MIN_STAKE, initialValidator)
       toChecksumAddress(SYSTEM_ADDRESS).should.be.equal(toChecksumAddress(await consensus.systemAddress()))
       false.should.be.equal(await consensus.isFinalized())
       MIN_STAKE.should.be.bignumber.equal(await consensus.minStake())
-      owner.should.equal(await consensus.owner())
-      let validators = await consensus.getValidators()
-      validators.length.should.be.equal(1)
-      validators[0].should.be.equal(initialValidator)
-      let pendingValidators = await consensus.getPendingValidators()
-      pendingValidators.length.should.be.equal(0)
-    })
-    it('owner address not defined - msg.sender should be owner', async () => {
-      await consensus.initialize(MIN_STAKE, initialValidator, ZERO_ADDRESS)
-      toChecksumAddress(SYSTEM_ADDRESS).should.be.equal(toChecksumAddress(await consensus.systemAddress()))
-      false.should.be.equal(await consensus.isFinalized())
-      MIN_STAKE.should.be.bignumber.equal(await consensus.minStake())
-      sender.should.equal(await consensus.owner())
       let validators = await consensus.getValidators()
       validators.length.should.be.equal(1)
       validators[0].should.be.equal(initialValidator)
@@ -52,11 +39,10 @@ contract('Consensus', async (accounts) => {
       pendingValidators.length.should.be.equal(0)
     })
     it('initial validator address not defined - owner should be initial validator', async () => {
-      await consensus.initialize(MIN_STAKE, ZERO_ADDRESS, owner)
+      await consensus.initialize(MIN_STAKE, ZERO_ADDRESS)
       toChecksumAddress(SYSTEM_ADDRESS).should.be.equal(toChecksumAddress(await consensus.systemAddress()))
       false.should.be.equal(await consensus.isFinalized())
       MIN_STAKE.should.be.bignumber.equal(await consensus.minStake())
-      owner.should.equal(await consensus.owner())
       let validators = await consensus.getValidators()
       validators.length.should.be.equal(1)
       validators[0].should.be.equal(owner)
@@ -64,11 +50,10 @@ contract('Consensus', async (accounts) => {
       pendingValidators.length.should.be.equal(0)
     })
     it('initial validator address defined', async () => {
-      await consensus.initialize(MIN_STAKE, initialValidator, owner)
+      await consensus.initialize(MIN_STAKE, initialValidator)
       toChecksumAddress(SYSTEM_ADDRESS).should.be.equal(toChecksumAddress(await consensus.systemAddress()))
       false.should.be.equal(await consensus.isFinalized())
       MIN_STAKE.should.be.bignumber.equal(await consensus.minStake())
-      owner.should.equal(await consensus.owner())
       let validators = await consensus.getValidators()
       validators.length.should.be.equal(1)
       validators[0].should.be.equal(initialValidator)
@@ -76,7 +61,7 @@ contract('Consensus', async (accounts) => {
       pendingValidators.length.should.be.equal(0)
     })
     it('only owner can set minStake', async () => {
-      await consensus.initialize(MIN_STAKE, initialValidator, owner)
+      await consensus.initialize(MIN_STAKE, initialValidator)
       await consensus.setMinStake(LESS_THAN_MIN_STAKE, {from: nonOwner}).should.be.rejectedWith(ERROR_MSG)
       MIN_STAKE.should.be.bignumber.equal(await consensus.minStake())
       await consensus.setMinStake(LESS_THAN_MIN_STAKE, {from: owner})
@@ -88,7 +73,7 @@ contract('Consensus', async (accounts) => {
       consensusImpl = await Consensus.new()
       proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
       consensus = await Consensus.at(proxy.address)
-      await consensus.initialize(MIN_STAKE, initialValidator, owner)
+      await consensus.initialize(MIN_STAKE, initialValidator)
     })
     it('should only be called by SYSTEM_ADDRESS', async () => {
       await consensus.finalizeChange().should.be.rejectedWith(ERROR_MSG)
@@ -107,7 +92,7 @@ contract('Consensus', async (accounts) => {
       consensusImpl = await Consensus.new()
       proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
       consensus = await Consensus.at(proxy.address)
-      await consensus.initialize(MIN_STAKE, initialValidator, owner)
+      await consensus.initialize(MIN_STAKE, initialValidator)
     })
     describe('basic', async () => {
       it('should no allow zero stake', async () => {
@@ -345,7 +330,7 @@ contract('Consensus', async (accounts) => {
       consensusImpl = await Consensus.new()
       proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
       consensus = await Consensus.at(proxy.address)
-      await consensus.initialize(MIN_STAKE, initialValidator, owner)
+      await consensus.initialize(MIN_STAKE, initialValidator)
     })
     it('cannot withdraw zero', async () => {
       await consensus.withdraw(ZERO_AMOUNT).should.be.rejectedWith(ERROR_MSG)

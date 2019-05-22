@@ -32,8 +32,6 @@ module.exports = function(deployer, network, accounts) {
     let minBallotDuration = MIN_BALLOT_DURATION_SECONDS || 172800
     let minPossibleThreshold = MIN_POSSIBLE_THRESHOLD || 3
 
-    let owner = accounts[0]
-
     let proxy
     let ballotsStorage, ballotsStorageImpl
     let blockReward, blockRewardImpl
@@ -49,13 +47,13 @@ module.exports = function(deployer, network, accounts) {
       consensusImpl = await Consensus.new()
       proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
       consensus = await Consensus.at(proxy.address)
-      await consensus.initialize(minStake, initialValidatorAddress, owner)
+      await consensus.initialize(minStake, initialValidatorAddress)
 
       // ProxyStorage
       proxyStorageImpl = await ProxyStorage.new()
       proxy = await EternalStorageProxy.new(ZERO_ADDRESS, proxyStorageImpl.address)
       proxyStorage = await ProxyStorage.at(proxy.address)
-      await proxyStorage.initialize(consensus.address, ZERO_ADDRESS)
+      await proxyStorage.initialize(consensus.address)
       // await consensus.setProxyStorage(proxyStorage.address) // TODO implement
 
       // BallotsStorage
@@ -68,7 +66,7 @@ module.exports = function(deployer, network, accounts) {
       blockRewardImpl = await BlockReward.new()
       proxy = await EternalStorageProxy.new(proxyStorage.address, blockRewardImpl.address)
       blockReward = await BlockReward.at(proxy.address)
-      await blockReward.initialize(blockRewardAmount, owner)
+      await blockReward.initialize(blockRewardAmount)
 
       // VotingToChangeBlockReward
       votingToChangeBlockRewardImpl = await VotingToChangeBlockReward.new()

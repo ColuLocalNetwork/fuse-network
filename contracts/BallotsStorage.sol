@@ -2,15 +2,19 @@ pragma solidity ^0.4.24;
 
 import "./abstracts/ThresholdTypesEnum.sol";
 import "./eternal-storage/EternalStorage.sol";
-import "./eternal-storage/EternalOwnable.sol";
 import "./ProxyStorage.sol";
 import "./Consensus.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract BallotsStorage is EternalStorage, EternalOwnable, ThresholdTypesEnum {
+contract BallotsStorage is EternalStorage, ThresholdTypesEnum {
   using SafeMath for uint256;
 
   event ThresholdChanged(uint256 indexed thresholdType, uint256 newValue);
+
+  modifier onlyOwner() {
+    require(msg.sender == addressStorage[keccak256(abi.encodePacked("owner"))]);
+    _;
+  }
 
   modifier onlyVotingToChangeThreshold() {
     require(msg.sender == getVotingToChangeThreshold());

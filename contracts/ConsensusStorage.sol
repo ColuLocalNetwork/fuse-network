@@ -1,11 +1,15 @@
 pragma solidity ^0.4.24;
 
 import "./eternal-storage/EternalStorage.sol";
-import "./eternal-storage/EternalOwnable.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract ConsensusStorage is EternalStorage, EternalOwnable {
+contract ConsensusStorage is EternalStorage {
     using SafeMath for uint256;
+
+    modifier onlyOwner() {
+      require(msg.sender == addressStorage[keccak256(abi.encodePacked("owner"))]);
+      _;
+    }
 
     function systemAddress() public view returns(address) {
       return addressStorage[keccak256(abi.encodePacked("SYSTEM_ADDRESS"))];
