@@ -62,7 +62,7 @@ contract BallotsStorage is EternalStorage, ThresholdTypesEnum {
   }
 
   function setThreshold(uint256 _value, uint256 _thresholdType) internal returns(bool) {
-    if (_value == 0) return false;
+    if (_value <= 0) return false;
     if (_thresholdType == uint256(ThresholdTypes.Invalid)) return false;
     if (_thresholdType > uint256(ThresholdTypes.Keys)) return false;
     uintStorage[keccak256(abi.encodePacked("ballotThresholds", _thresholdType))] = _value;
@@ -73,7 +73,7 @@ contract BallotsStorage is EternalStorage, ThresholdTypesEnum {
     return uintStorage[keccak256(abi.encodePacked("ballotThresholds", _ballotType))];
   }
 
-  function getProxyStorage() internal view returns(address) {
+  function getProxyStorage() public view returns(address) {
     return addressStorage[keccak256(abi.encodePacked("proxyStorage"))];
   }
 
@@ -90,6 +90,6 @@ contract BallotsStorage is EternalStorage, ThresholdTypesEnum {
   }
 
   function getMaxLimitBallot() public pure returns(uint256) {
-    return 200;
+    return 100;
   }
 }
