@@ -1,5 +1,6 @@
 const Consensus = artifacts.require('ConsensusMock.sol')
 const EternalStorageProxy = artifacts.require('EternalStorageProxy.sol')
+const ProxyStorage = artifacts.require('ProxyStorage.sol')
 const {ERROR_MSG, ZERO_AMOUNT, ZERO_ADDRESS} = require('./helpers')
 const {toBN, toWei, toChecksumAddress} = web3.utils
 
@@ -11,6 +12,7 @@ const LESS_THAN_MIN_STAKE = toWei(toBN(MIN_STAKE_AMOUNT - 1), 'ether')
 const MORE_THAN_MIN_STAKE = toWei(toBN(MIN_STAKE_AMOUNT + 1), 'ether')
 const MULTIPLE_MIN_STAKE = toWei(toBN(MIN_STAKE_AMOUNT * MULTIPLY_AMOUNT), 'ether')
 const SYSTEM_ADDRESS = '0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE'
+const RANDOM_ADDRESS = '0xc0ffee254729296a45a3885639AC7E10F9d54979'
 
 contract('Consensus', async (accounts) => {
   let consensusImpl, proxy, consensus
@@ -60,14 +62,57 @@ contract('Consensus', async (accounts) => {
       let pendingValidators = await consensus.getPendingValidators()
       pendingValidators.length.should.be.equal(0)
     })
-    it('only owner can set minStake', async () => {
+  })
+
+  describe('setMinStake', async () => {
+    beforeEach(async () => {
+      consensusImpl = await Consensus.new()
+      proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
+      consensus = await Consensus.at(proxy.address)
       await consensus.initialize(MIN_STAKE, initialValidator)
+    })
+    it('setMinStake should fail if not called by owner', async () => {
       await consensus.setMinStake(LESS_THAN_MIN_STAKE, {from: nonOwner}).should.be.rejectedWith(ERROR_MSG)
       MIN_STAKE.should.be.bignumber.equal(await consensus.minStake())
+    })
+    it('setMinStake successfully', async () => {
       await consensus.setMinStake(LESS_THAN_MIN_STAKE, {from: owner})
       LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.minStake())
     })
   })
+
+  describe('setProxyStorage', async () => {
+    beforeEach(async () => {
+      consensusImpl = await Consensus.new()
+      proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
+      consensus = await Consensus.at(proxy.address)
+      await consensus.initialize(MIN_STAKE, initialValidator)
+      let proxyStorageImpl = await ProxyStorage.new()
+      proxy = await EternalStorageProxy.new(ZERO_ADDRESS, proxyStorageImpl.address)
+      proxyStorage = await ProxyStorage.at(proxy.address)
+      await proxyStorage.initialize(consensus.address)
+    })
+    it('setProxyStorage should fail if no address', async () => {
+      await consensus.setProxyStorage(ZERO_ADDRESS).should.be.rejectedWith(ERROR_MSG)
+    })
+    it('setProxyStorage should fail if not called by owner', async () => {
+      await consensus.setProxyStorage(proxyStorage.address, {from: nonOwner}).should.be.rejectedWith(ERROR_MSG)
+      // success
+      await consensus.setProxyStorage(proxyStorage.address).should.be.fulfilled
+      proxyStorage.address.should.be.equal(await consensus.getProxyStorage())
+      // should not be able to set again if already set
+      await consensus.setProxyStorage(RANDOM_ADDRESS).should.be.rejectedWith(ERROR_MSG)
+    })
+    it('setProxyStorage successfully', async () => {
+      await consensus.setProxyStorage(proxyStorage.address).should.be.fulfilled
+      proxyStorage.address.should.be.equal(await consensus.getProxyStorage())
+    })
+    it('setProxyStorage should not be able to set again if already set', async () => {
+      await consensus.setProxyStorage(proxyStorage.address).should.be.fulfilled
+      await consensus.setProxyStorage(RANDOM_ADDRESS).should.be.rejectedWith(ERROR_MSG)
+    })
+  })
+
   describe('finalizeChange', async () => {
     beforeEach(async () => {
       consensusImpl = await Consensus.new()
@@ -87,6 +132,7 @@ contract('Consensus', async (accounts) => {
       true.should.be.equal(await consensus.isFinalized())
     })
   })
+
   describe('stake using payable', async () => {
     beforeEach(async () => {
       consensusImpl = await Consensus.new()
@@ -134,6 +180,7 @@ contract('Consensus', async (accounts) => {
         logs[0].args['newSet'].should.deep.equal(pendingValidators)
       })
     })
+
     describe('advanced', async () => {
       it('more than minimum stake amount, in more than one transaction', async () => {
         // 1st stake
@@ -325,6 +372,7 @@ contract('Consensus', async (accounts) => {
       })
     })
   })
+
   describe('withdraw', async () => {
     beforeEach(async () => {
       consensusImpl = await Consensus.new()

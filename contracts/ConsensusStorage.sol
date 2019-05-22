@@ -154,7 +154,7 @@ contract ConsensusStorage is EternalStorage {
       uintArrayStorage[keccak256(abi.encodePacked("validatorIndexes", _address))] = _indexes;
     }
 
-    function getProxyStorage() internal view returns(address) {
+    function getProxyStorage() public view returns(address) {
       return addressStorage[keccak256(abi.encodePacked("proxyStorage"))];
     }
 

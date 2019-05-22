@@ -25,15 +25,23 @@ contract('BlockReward', async (accounts) => {
       toChecksumAddress(SYSTEM_ADDRESS).should.be.equal(toChecksumAddress(await blockReward.systemAddress()))
       REWARD.should.be.bignumber.equal(await blockReward.getReward())
     })
-    it('only owner can set reward', async () => {
+  })
+
+  describe('setReward', async () => {
+    beforeEach(async () => {
+      blockRewardImpl = await BlockReward.new()
+      proxy = await EternalStorageProxy.new(ZERO_ADDRESS, blockRewardImpl.address)
+      owner.should.equal(await proxy.getOwner())
+      blockReward = await BlockReward.at(proxy.address)
       await blockReward.initialize(REWARD)
+    })
+    it('only owner can set reward', async () => {
       await blockReward.setReward(REWARD_OTHER, {from: nonOwner}).should.be.rejectedWith(ERROR_MSG)
       REWARD.should.be.bignumber.equal(await blockReward.getReward())
       await blockReward.setReward(REWARD_OTHER, {from: owner})
       REWARD_OTHER.should.be.bignumber.equal(await blockReward.getReward())
     })
     it('can set zero reward', async () => {
-      await blockReward.initialize(REWARD)
       await blockReward.setReward(ZERO_AMOUNT, {from: owner})
       ZERO_AMOUNT.should.be.bignumber.equal(await blockReward.getReward())
     })
