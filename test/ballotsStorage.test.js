@@ -1,7 +1,7 @@
 const Consensus = artifacts.require('ConsensusMock.sol')
 const ProxyStorage = artifacts.require('ProxyStorageMock.sol')
-const BallotsStorage = artifacts.require('BallotsStorage.sol')
 const EternalStorageProxy = artifacts.require('EternalStorageProxyMock.sol')
+const BallotsStorage = artifacts.require('BallotsStorage.sol')
 const {ERROR_MSG, ZERO_AMOUNT, ZERO_ADDRESS} = require('./helpers')
 const {toBN, toWei} = web3.utils
 
