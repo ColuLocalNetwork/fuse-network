@@ -1,7 +1,7 @@
 const Consensus = artifacts.require('ConsensusMock.sol')
 const ProxyStorage = artifacts.require('ProxyStorage.sol')
 const EternalStorageProxy = artifacts.require('EternalStorageProxyMock.sol')
-const {ERROR_MSG, ZERO_AMOUNT, ZERO_ADDRESS} = require('./helpers')
+const {ERROR_MSG, ZERO_AMOUNT, SYSTEM_ADDRESS, ZERO_ADDRESS, RANDOM_ADDRESS} = require('./helpers')
 const {toBN, toWei, toChecksumAddress} = web3.utils
 
 const MIN_STAKE_AMOUNT = 10000
@@ -11,8 +11,6 @@ const ONE_ETHER = toWei(toBN(1), 'ether')
 const LESS_THAN_MIN_STAKE = toWei(toBN(MIN_STAKE_AMOUNT - 1), 'ether')
 const MORE_THAN_MIN_STAKE = toWei(toBN(MIN_STAKE_AMOUNT + 1), 'ether')
 const MULTIPLE_MIN_STAKE = toWei(toBN(MIN_STAKE_AMOUNT * MULTIPLY_AMOUNT), 'ether')
-const SYSTEM_ADDRESS = '0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE'
-const RANDOM_ADDRESS = '0xc0ffee254729296a45a3885639AC7E10F9d54979'
 
 contract('Consensus', async (accounts) => {
   let consensusImpl, proxy, consensus

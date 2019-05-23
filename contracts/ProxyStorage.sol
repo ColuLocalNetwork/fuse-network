@@ -12,6 +12,7 @@ contract ProxyStorage is EternalStorage {
     Consensus,
     BlockReward,
     BallotsStorage,
+    ProxyStorage,
     VotingToChangeBlockReward,
     VotingToChangeMinStake,
     VotingToChangeMinThreshold,
@@ -50,12 +51,16 @@ contract ProxyStorage is EternalStorage {
   }
 
   function initializeAddresses(address _blockReward, address _ballotsStorage, address _votingToChangeBlockReward, address _votingToChangeMinStake, address _votingToChangeMinThreshold, address _votingToChangeProxy) public onlyOwner {
+    require (!boolStorage[keccak256(abi.encodePacked("proxyStorageAddressesInitialized"))]);
+
     addressStorage[keccak256(abi.encodePacked("blockReward"))] = _blockReward;
     addressStorage[keccak256(abi.encodePacked("ballotsStorage"))] = _ballotsStorage;
     addressStorage[keccak256(abi.encodePacked("votingToChangeBlockReward"))] = _votingToChangeBlockReward;
     addressStorage[keccak256(abi.encodePacked("votingToChangeMinStake"))] = _votingToChangeMinStake;
     addressStorage[keccak256(abi.encodePacked("votingToChangeMinThreshold"))] = _votingToChangeMinThreshold;
     addressStorage[keccak256(abi.encodePacked("votingToChangeProxy"))] = _votingToChangeProxy;
+
+    boolStorage[keccak256(abi.encodePacked("proxyStorageAddressesInitialized"))] = true;
 
     emit ProxyInitialized(
       getConsensus(),
@@ -80,6 +85,8 @@ contract ProxyStorage is EternalStorage {
       success = EternalStorageProxy(getBlockReward()).upgradeTo(_contractAddress);
     } else if (_contractType == uint256(ContractTypes.BallotsStorage)) {
       success = EternalStorageProxy(getBallotsStorage()).upgradeTo(_contractAddress);
+    } else if (_contractType == uint256(ContractTypes.ProxyStorage)) {
+      success = EternalStorageProxy(this).upgradeTo(_contractAddress);
     } else if (_contractType == uint256(ContractTypes.VotingToChangeBlockReward)) {
       success = EternalStorageProxy(getVotingToChangeBlockReward()).upgradeTo(_contractAddress);
     } else if (_contractType == uint256(ContractTypes.VotingToChangeMinStake)) {
@@ -91,7 +98,7 @@ contract ProxyStorage is EternalStorage {
     }
 
     if (success) {
-        emit AddressSet(_contractType, _contractAddress);
+      emit AddressSet(_contractType, _contractAddress);
     }
     return success;
   }
