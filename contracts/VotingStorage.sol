@@ -21,7 +21,7 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
   }
 
   function isActiveBallot(uint256 _id) public view returns(bool) {
-    return getStartTime(_id) <= getTime() && getEndTime(_id) >= getTime();
+    return getStartTime(_id) <= getTime() && getTime() <= getEndTime(_id);
   }
 
   function getMinThresholdOfVoters(uint256 _id) public view returns(uint256) {
@@ -52,15 +52,15 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
     return uintStorage[keccak256(abi.encodePacked("minBallotDuration"))];
   }
 
-  function setMinBallotDuration(uint256 _id) internal {
-    uintStorage[keccak256(abi.encodePacked("minBallotDuration"))] = _id;
+  function setMinBallotDuration(uint256 _value) internal {
+    uintStorage[keccak256(abi.encodePacked("minBallotDuration"))] = _value;
   }
 
   function getMaxBallotDuration() public pure returns(uint256) {
     return 14 days;
   }
 
-  function getStartTime(uint256 _id) internal view returns(uint256) {
+  function getStartTime(uint256 _id) public view returns(uint256) {
     return uintStorage[keccak256(abi.encodePacked("votingState", _id, "startTime"))];
   }
 
@@ -68,7 +68,7 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
     uintStorage[keccak256(abi.encodePacked("votingState", _id, "startTime"))] = _value;
   }
 
-  function getEndTime(uint256 _id) internal view returns(uint256) {
+  function getEndTime(uint256 _id) public view returns(uint256) {
     return uintStorage[keccak256(abi.encodePacked("votingState", _id, "endTime"))];
   }
 
@@ -76,7 +76,7 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
     uintStorage[keccak256(abi.encodePacked("votingState", _id, "endTime"))] = _value;
   }
 
-  function getIsFinalized(uint256 _id) internal view returns(bool) {
+  function getIsFinalized(uint256 _id) public view returns(bool) {
     return boolStorage[keccak256(abi.encodePacked("votingState", _id, "isFinalized"))];
   }
 
@@ -84,7 +84,7 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
     boolStorage[keccak256(abi.encodePacked("votingState", _id, "isFinalized"))] = _value;
   }
 
-  function getDescription(uint256 _id) internal view returns(string) {
+  function getDescription(uint256 _id) public view returns(string) {
     return stringStorage[keccak256(abi.encodePacked("votingState", _id, "description"))];
   }
 
@@ -92,7 +92,7 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
     stringStorage[keccak256(abi.encodePacked("votingState", _id, "description"))] = _value;
   }
 
-  function getCreator(uint256 _id) internal view returns(address) {
+  function getCreator(uint256 _id) public view returns(address) {
     return addressStorage[keccak256(abi.encodePacked("votingState", _id, "creator"))];
   }
 
@@ -100,7 +100,7 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
     addressStorage[keccak256(abi.encodePacked("votingState", _id, "creator"))] = _value;
   }
 
-  function getTotalVoters(uint256 _id) internal view returns(uint256) {
+  function getTotalVoters(uint256 _id) public view returns(uint256) {
     return uintStorage[keccak256(abi.encodePacked("votingState", _id, "totalVoters"))];
   }
 
@@ -108,7 +108,7 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
     uintStorage[keccak256(abi.encodePacked("votingState", _id, "totalVoters"))] = _value;
   }
 
-  function getProgress(uint256 _id) internal view returns(int256) {
+  function getProgress(uint256 _id) public view returns(int256) {
     return intStorage[keccak256(abi.encodePacked("votingState", _id, "progress"))];
   }
 
@@ -116,7 +116,7 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
     intStorage[keccak256(abi.encodePacked("votingState", _id, "progress"))] = _value;
   }
 
-  function getIndex(uint256 _id) internal view returns(uint256) {
+  function getIndex(uint256 _id) public view returns(uint256) {
     return uintStorage[keccak256(abi.encodePacked("votingState", _id, "index"))];
   }
 
@@ -170,7 +170,7 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
     }
   }
 
-  function getFinalizeCalled(uint256 _id) internal view returns(bool) {
+  function getFinalizeCalled(uint256 _id) public view returns(bool) {
     return boolStorage[keccak256(abi.encodePacked("finalizeCalled", _id))];
   }
 
@@ -178,7 +178,7 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
     boolStorage[keccak256(abi.encodePacked("finalizeCalled", _id))] = true;
   }
 
-  function getProxyStorage() internal view returns(address) {
+  function getProxyStorage() public view returns(address) {
     return addressStorage[keccak256(abi.encodePacked("proxyStorage"))];
   }
 
@@ -186,11 +186,11 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
     return BallotsStorage(ProxyStorage(getProxyStorage()).getBallotsStorage());
   }
 
-  function getBallotLimitPerValidator() internal view returns(uint256) {
+  function getBallotLimitPerValidator() public view returns(uint256) {
     return getBallotsStorage().getBallotLimitPerValidator();
   }
 
-  function getGlobalMinThresholdOfVoters() internal view returns(uint256) {
+  function getGlobalMinThresholdOfVoters() public view returns(uint256) {
     return getBallotsStorage().getBallotThreshold(uint256(ThresholdTypes.Keys));
   }
 
@@ -207,7 +207,7 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
 
   function isValidVote(uint256 _id, address _key) public view returns(bool) {
     bool isActive = isActiveBallot(_id);
-    bool hasVoted = !hasAlreadyVoted(_id, _key);
+    bool hasVoted = hasAlreadyVoted(_id, _key);
     return isActive && !hasVoted;
   }
 

@@ -37,7 +37,7 @@ contract VotingToChangeMinThreshold is Voting {
       return true;
     }
 
-    function getMinPossibleThreshold() internal view returns(uint256) {
+    function getMinPossibleThreshold() public view returns(uint256) {
       return uintStorage[keccak256(abi.encodePacked("minPossibleThreshold"))];
     }
 

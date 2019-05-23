@@ -5,7 +5,10 @@ const BallotsStorage = artifacts.require('BallotsStorage.sol')
 const {ERROR_MSG, ZERO_AMOUNT, ZERO_ADDRESS} = require('./helpers')
 const {toBN, toWei} = web3.utils
 
-const THRESHOLD_TYPES = {INVALID: 0, KEYS: 1}
+const THRESHOLD_TYPES = {
+  INVALID: 0,
+  KEYS: 1
+}
 const BALLOTS_THRESHOLDS = [3]
 
 contract('BallotsStorage', async (accounts) => {
