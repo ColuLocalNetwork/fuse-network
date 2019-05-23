@@ -8,7 +8,7 @@ const ProxyStorage = artifacts.require('./ProxyStorage.sol')
 const VotingToChangeBlockReward = artifacts.require('./VotingToChangeBlockReward.sol')
 const VotingToChangeMinStake = artifacts.require('./VotingToChangeMinStake.sol')
 const VotingToChangeMinThreshold = artifacts.require('./VotingToChangeMinThreshold.sol')
-const VotingToChangeProxyAddress = artifacts.require('./VotingToChangeProxyAddress.sol')
+// const VotingToChangeProxyAddress = artifacts.require('./VotingToChangeProxyAddress.sol') // TODO uncomment
 
 const {toBN, toWei} = web3.utils
 

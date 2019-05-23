@@ -9,16 +9,19 @@ const {toBN, toWei, toChecksumAddress} = web3.utils
 
 const THRESHOLD_TYPES = {
   INVALID: 0,
-  KEYS: 1
+  VOTERS: 1,
+  BLOCK_REWARD: 2,
+  MIN_STAKE: 3
 }
-const BALLOTS_THRESHOLDS = [3]
+
+const BALLOTS_THRESHOLDS = [3, 0, toWei(toBN(100), 'ether')]
 const MIN_BALLOT_DURATION_SECONDS = 172800 // 2 days
 const MIN_POSSIBLE_THRESHOLD = 3
 
 const BALLOT_TYPES = {
   INVALID: 0,
-  MIN_STAKE: 1,
-  MIN_THRESHOLD: 2,
+  MIN_THRESHOLD: 1,
+  MIN_STAKE: 2,
   BLOCK_REWARD: 3,
   PROXY_ADDRESS: 4
 }
@@ -190,7 +193,7 @@ contract('VotingToChangeMinThreshold', async (accounts) => {
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
 
       // require(_proposedValue != getGlobalMinThresholdOfVoters());
-      proposedValue = BALLOTS_THRESHOLDS[0]
+      proposedValue = await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.VOTERS)
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
 
       // require(_proposedValue <= getBallotsStorage().getProxyThreshold());
@@ -334,7 +337,7 @@ contract('VotingToChangeMinThreshold', async (accounts) => {
       ballotInfo.alreadyVoted.should.be.equal(true)
       toBN(QUORUM_STATES.ACCEPTED).should.be.bignumber.equal(await voting.getQuorumState(id))
       toBN(0).should.be.bignumber.equal(await voting.getIndex(id))
-      toBN(proposedValue).should.be.bignumber.equal(await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.KEYS))
+      toBN(proposedValue).should.be.bignumber.equal(await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.VOTERS))
     })
     it('should not change to proposed value if quorum is not reached', async () => {
       let id = await voting.getNextBallotId()
@@ -364,7 +367,7 @@ contract('VotingToChangeMinThreshold', async (accounts) => {
       ballotInfo.alreadyVoted.should.be.equal(true)
       toBN(QUORUM_STATES.REJECTED).should.be.bignumber.equal(await voting.getQuorumState(id))
       toBN(0).should.be.bignumber.equal(await voting.getIndex(id))
-      toBN(proposedValue).should.not.be.bignumber.equal(await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.KEYS))
+      toBN(proposedValue).should.not.be.bignumber.equal(await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.VOTERS))
     })
     it('should fail if trying to finalize twice', async () => {
       let id = await voting.getNextBallotId()

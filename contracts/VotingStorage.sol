@@ -1,11 +1,11 @@
 pragma solidity ^0.4.24;
 
-import "./abstracts/ThresholdTypesEnum.sol";
+import "./abstracts/VotingEnums.sol";
 import "./eternal-storage/EternalStorage.sol";
 import "./BallotsStorage.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract VotingStorage is EternalStorage, ThresholdTypesEnum {
+contract VotingStorage is EternalStorage, VotingEnums {
   using SafeMath for uint256;
 
   function getTime() public view returns(uint256) {
@@ -191,7 +191,15 @@ contract VotingStorage is EternalStorage, ThresholdTypesEnum {
   }
 
   function getGlobalMinThresholdOfVoters() public view returns(uint256) {
-    return getBallotsStorage().getBallotThreshold(uint256(ThresholdTypes.Keys));
+    return getBallotsStorage().getBallotThreshold(uint256(ThresholdTypes.Voters));
+  }
+
+  function getGlobalMinBlockReward() public view returns(uint256) {
+    return getBallotsStorage().getBallotThreshold(uint256(ThresholdTypes.BlockReward));
+  }
+
+  function getGlobalMinStake() public view returns(uint256) {
+    return getBallotsStorage().getBallotThreshold(uint256(ThresholdTypes.MinStake));
   }
 
   function votersAdd(uint256 _id, address _key) internal {

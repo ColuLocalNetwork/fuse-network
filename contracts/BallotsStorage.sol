@@ -1,12 +1,12 @@
 pragma solidity ^0.4.24;
 
-import "./abstracts/ThresholdTypesEnum.sol";
+import "./abstracts/VotingEnums.sol";
 import "./eternal-storage/EternalStorage.sol";
 import "./ProxyStorage.sol";
 import "./Consensus.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract BallotsStorage is EternalStorage, ThresholdTypesEnum {
+contract BallotsStorage is EternalStorage, VotingEnums {
   using SafeMath for uint256;
 
   event ThresholdChanged(uint256 indexed thresholdType, uint256 newValue);
@@ -23,10 +23,10 @@ contract BallotsStorage is EternalStorage, ThresholdTypesEnum {
 
   function initialize(uint256[] _thresholds) public onlyOwner {
     require(!isInitialized());
-    require(_thresholds.length == uint256(ThresholdTypes.Keys));
-    uint256 thresholdType = uint256(ThresholdTypes.Keys);
+    require(_thresholds.length == uint256(ThresholdTypes.MinStake));
+    uint256 thresholdType = uint256(ThresholdTypes.Voters);
     for (; thresholdType <= _thresholds.length; thresholdType++) {
-      uint256 thresholdValue = _thresholds[thresholdType - uint256(ThresholdTypes.Keys)];
+      uint256 thresholdValue = _thresholds[thresholdType - uint256(ThresholdTypes.Voters)];
       if (!setThreshold(thresholdValue, thresholdType)) {
         revert();
       }
@@ -62,9 +62,12 @@ contract BallotsStorage is EternalStorage, ThresholdTypesEnum {
   }
 
   function setThreshold(uint256 _value, uint256 _thresholdType) internal returns(bool) {
-    if (_value <= 0) return false;
+    if (_value < 0) return false;
     if (_thresholdType == uint256(ThresholdTypes.Invalid)) return false;
-    if (_thresholdType > uint256(ThresholdTypes.Keys)) return false;
+    if (_thresholdType > uint256(ThresholdTypes.MinStake)) return false;
+    if (_thresholdType == uint256(ThresholdTypes.Voters)) {
+      if (_value == 0) return false;
+    }
     uintStorage[keccak256(abi.encodePacked("ballotThresholds", _thresholdType))] = _value;
     return true;
   }

@@ -1,13 +1,12 @@
 pragma solidity ^0.4.24;
 
 import "./abstracts/VotingBase.sol";
-import "./abstracts/VotingEnums.sol";
 import "./VotingStorage.sol";
 import "./ProxyStorage.sol";
 import "./Consensus.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
-contract Voting is VotingStorage, VotingBase, VotingEnums {
+contract Voting is VotingStorage, VotingBase {
   using SafeMath for uint256;
 
   modifier onlyValidTime(uint256 _startTime, uint256 _endTime) {

@@ -7,9 +7,12 @@ const {toBN, toWei} = web3.utils
 
 const THRESHOLD_TYPES = {
   INVALID: 0,
-  KEYS: 1
+  VOTERS: 1,
+  BLOCK_REWARD: 2,
+  MIN_STAKE: 3
 }
-const BALLOTS_THRESHOLDS = [3]
+
+const BALLOTS_THRESHOLDS = [3, 0, toWei(toBN(100), 'ether')]
 
 contract('BallotsStorage', async (accounts) => {
   let ballotsStorageImpl, proxy, ballotsStorage
@@ -53,16 +56,19 @@ contract('BallotsStorage', async (accounts) => {
   describe('initialize', async () => {
     it('should be successful', async () => {
       await ballotsStorage.initialize(BALLOTS_THRESHOLDS).should.be.fulfilled
-      toBN(BALLOTS_THRESHOLDS[THRESHOLD_TYPES.KEYS-1]).should.be.bignumber.equal(await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.KEYS))
+      toBN(BALLOTS_THRESHOLDS[THRESHOLD_TYPES.VOTERS-1]).should.be.bignumber.equal(await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.VOTERS))
+      toBN(BALLOTS_THRESHOLDS[THRESHOLD_TYPES.BLOCK_REWARD-1]).should.be.bignumber.equal(await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.BLOCK_REWARD))
+      toBN(BALLOTS_THRESHOLDS[THRESHOLD_TYPES.MIN_STAKE-1]).should.be.bignumber.equal(await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.MIN_STAKE))
     })
     it('should fail if thresholds array is empty', async () => {
       await ballotsStorage.initialize([]).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if thresholds array size is different from ThresholdTypes size', async () => {
-      await ballotsStorage.initialize([3,3]).should.be.rejectedWith(ERROR_MSG)
+      await ballotsStorage.initialize([3, 0]).should.be.rejectedWith(ERROR_MSG)
+      await ballotsStorage.initialize([3, 0, toWei(toBN(100), 'ether'), 7]).should.be.rejectedWith(ERROR_MSG)
     })
-    it('should fail if thresholds array contains 0', async () => {
-      await ballotsStorage.initialize([0]).should.be.rejectedWith(ERROR_MSG)
+    it('should fail if threshold type "Voters" is 0', async () => {
+      await ballotsStorage.initialize([0, 0, toWei(toBN(100), 'ether')]).should.be.rejectedWith(ERROR_MSG)
     })
   })
 
@@ -72,17 +78,17 @@ contract('BallotsStorage', async (accounts) => {
     })
     it('should be successful', async () => {
       let newValue = 5
-      let {logs} = await ballotsStorage.setBallotThreshold(newValue, THRESHOLD_TYPES.KEYS, {from: votingToChangeMinThreshold})
+      let {logs} = await ballotsStorage.setBallotThreshold(newValue, THRESHOLD_TYPES.VOTERS, {from: votingToChangeMinThreshold})
       logs.length.should.be.equal(1)
       logs[0].event.should.be.equal('ThresholdChanged')
-      logs[0].args['thresholdType'].should.be.bignumber.equal(toBN(THRESHOLD_TYPES.KEYS))
+      logs[0].args['thresholdType'].should.be.bignumber.equal(toBN(THRESHOLD_TYPES.VOTERS))
       logs[0].args['newValue'].should.be.bignumber.equal(toBN(newValue))
     })
     it('should fail if not called from votingToChangeMinThreshold address', async () => {
-      await ballotsStorage.setBallotThreshold(5, THRESHOLD_TYPES.KEYS, {from: owner}).should.be.rejectedWith(ERROR_MSG)
+      await ballotsStorage.setBallotThreshold(5, THRESHOLD_TYPES.VOTERS, {from: owner}).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if trying to set threshold 0', async () => {
-      let {logs} = await ballotsStorage.setBallotThreshold(0, THRESHOLD_TYPES.KEYS, {from: votingToChangeMinThreshold})
+      let {logs} = await ballotsStorage.setBallotThreshold(0, THRESHOLD_TYPES.VOTERS, {from: votingToChangeMinThreshold})
       logs.length.should.be.equal(0)
     })
     it('should fail if trying to set "Invalid" threshold type', async () => {
@@ -90,7 +96,7 @@ contract('BallotsStorage', async (accounts) => {
       logs.length.should.be.equal(0)
     })
     it('should fail if trying to set non-existing threshold type', async () => {
-      let {logs} = await ballotsStorage.setBallotThreshold(5, 2, {from: votingToChangeMinThreshold})
+      let {logs} = await ballotsStorage.setBallotThreshold(5, Object.keys(THRESHOLD_TYPES).length + 1, {from: votingToChangeMinThreshold})
       logs.length.should.be.equal(0)
     })
   })
@@ -190,11 +196,11 @@ contract('BallotsStorage', async (accounts) => {
     })
     it('should use same storage after upgrade', async () => {
       let newValue = 5
-      await ballotsStorage.setBallotThreshold(newValue, THRESHOLD_TYPES.KEYS, {from: votingToChangeMinThreshold})
+      await ballotsStorage.setBallotThreshold(newValue, THRESHOLD_TYPES.VOTERS, {from: votingToChangeMinThreshold})
       await proxy.setProxyStorageMock(proxyStorageStub)
       await proxy.upgradeTo(ballotsStorageNew.address, {from: proxyStorageStub})
       ballotsStorageNew = await BallotsStorage.at(proxy.address)
-      toBN(newValue).should.be.bignumber.equal(await ballotsStorageNew.getBallotThreshold(THRESHOLD_TYPES.KEYS))
+      toBN(newValue).should.be.bignumber.equal(await ballotsStorageNew.getBallotThreshold(THRESHOLD_TYPES.VOTERS))
     })
   })
 })
