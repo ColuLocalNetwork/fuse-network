@@ -6,8 +6,4 @@ contract BlockRewardMock is BlockReward {
   function setSystemAddress(address _newAddress) public onlyOwner {
     addressStorage[keccak256(abi.encodePacked("SYSTEM_ADDRESS"))] = _newAddress;
   }
-
-  function getProxyStorage() public view returns(address) {
-    return addressStorage[keccak256(abi.encodePacked("proxyStorage"))];
-  }
 }

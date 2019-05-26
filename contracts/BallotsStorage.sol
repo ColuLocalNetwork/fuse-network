@@ -16,8 +16,11 @@ contract BallotsStorage is EternalStorage, VotingEnums {
     _;
   }
 
-  modifier onlyVotingToChangeThreshold() {
-    require(msg.sender == getVotingToChangeThreshold());
+  modifier onlyVotingToChange() {
+    bool isVotingToChangeBlockReward = msg.sender == getVotingToChangeBlockReward();
+    bool isVotingToChangeMinStake = msg.sender == getVotingToChangeMinStake();
+    bool isVotingToChangeMinThreshold = msg.sender == getVotingToChangeMinThreshold();
+    require(isVotingToChangeBlockReward || isVotingToChangeMinStake || isVotingToChangeMinThreshold);
     _;
   }
 
@@ -54,7 +57,7 @@ contract BallotsStorage is EternalStorage, VotingEnums {
     return limit;
   }
 
-  function setBallotThreshold(uint256 _value, uint256 _thresholdType) public onlyVotingToChangeThreshold returns(bool) {
+  function setBallotThreshold(uint256 _value, uint256 _thresholdType) public onlyVotingToChange returns(bool) {
     if (_value == getBallotThreshold(_thresholdType)) return false;
     if (!setThreshold(_value, _thresholdType)) return false;
     emit ThresholdChanged(_thresholdType, _value);
@@ -80,7 +83,15 @@ contract BallotsStorage is EternalStorage, VotingEnums {
     return addressStorage[keccak256(abi.encodePacked("proxyStorage"))];
   }
 
-  function getVotingToChangeThreshold() public view returns(address) {
+  function getVotingToChangeBlockReward() public view returns(address) {
+    return ProxyStorage(getProxyStorage()).getVotingToChangeBlockReward();
+  }
+
+  function getVotingToChangeMinStake() public view returns(address) {
+    return ProxyStorage(getProxyStorage()).getVotingToChangeMinStake();
+  }
+
+  function getVotingToChangeMinThreshold() public view returns(address) {
     return ProxyStorage(getProxyStorage()).getVotingToChangeMinThreshold();
   }
 

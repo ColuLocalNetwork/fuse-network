@@ -12,7 +12,12 @@ const THRESHOLD_TYPES = {
   MIN_STAKE: 3
 }
 
-const BALLOTS_THRESHOLDS = [3, 0, toWei(toBN(100), 'ether')]
+const GLOBAL_VALUES = {
+  VOTERS: 3,
+  BLOCK_REWARD: toWei(toBN(10), 'ether'),
+  MIN_STAKE: toWei(toBN(100), 'ether')
+}
+const BALLOTS_THRESHOLDS = [GLOBAL_VALUES.VOTERS, GLOBAL_VALUES.BLOCK_REWARD, GLOBAL_VALUES.MIN_STAKE]
 
 contract('BallotsStorage', async (accounts) => {
   let ballotsStorageImpl, proxy, ballotsStorage
@@ -116,15 +121,39 @@ contract('BallotsStorage', async (accounts) => {
     })
   })
 
-  describe('getVotingToChangeThreshold', async () => {
+  describe('getVotingToChangeBlockReward', async () => {
+    beforeEach(async () => {
+      await ballotsStorage.initialize(BALLOTS_THRESHOLDS)
+    })
+    it('should return correct address', async () => {
+      let newVotingToChangeBlockReward = accounts[6]
+      votingToChangeBlockReward.should.be.equal(await ballotsStorage.getVotingToChangeBlockReward())
+      await proxyStorage.setVotingToChangeBlockReward(newVotingToChangeBlockReward)
+      newVotingToChangeBlockReward.should.be.equal(await ballotsStorage.getVotingToChangeBlockReward())
+    })
+  })
+
+  describe('getVotingToChangeMinStake', async () => {
+    beforeEach(async () => {
+      await ballotsStorage.initialize(BALLOTS_THRESHOLDS)
+    })
+    it('should return correct address', async () => {
+      let newVotingToChangeMinStake = accounts[6]
+      votingToChangeMinStake.should.be.equal(await ballotsStorage.getVotingToChangeMinStake())
+      await proxyStorage.setVotingToChangeMinStake(newVotingToChangeMinStake)
+      newVotingToChangeMinStake.should.be.equal(await ballotsStorage.getVotingToChangeMinStake())
+    })
+  })
+
+  describe('getVotingToChangeMinThreshold', async () => {
     beforeEach(async () => {
       await ballotsStorage.initialize(BALLOTS_THRESHOLDS)
     })
     it('should return correct address', async () => {
       let newVotingToChangeMinThreshold = accounts[6]
-      votingToChangeMinThreshold.should.be.equal(await ballotsStorage.getVotingToChangeThreshold())
+      votingToChangeMinThreshold.should.be.equal(await ballotsStorage.getVotingToChangeMinThreshold())
       await proxyStorage.setVotingToChangeMinThreshold(newVotingToChangeMinThreshold)
-      newVotingToChangeMinThreshold.should.be.equal(await ballotsStorage.getVotingToChangeThreshold())
+      newVotingToChangeMinThreshold.should.be.equal(await ballotsStorage.getVotingToChangeMinThreshold())
     })
   })
 

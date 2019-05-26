@@ -1,6 +1,7 @@
 pragma solidity ^0.4.24;
 
 import "./eternal-storage/EternalStorage.sol";
+import "./ProxyStorage.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract BlockRewardStorage is EternalStorage {
@@ -8,6 +9,11 @@ contract BlockRewardStorage is EternalStorage {
 
     modifier onlyOwner() {
       require(msg.sender == addressStorage[keccak256(abi.encodePacked("owner"))]);
+      _;
+    }
+
+    modifier onlyOwnerOrVotingToChange() {
+      require(msg.sender == addressStorage[keccak256(abi.encodePacked("owner"))] || msg.sender == ProxyStorage(getProxyStorage()).getVotingToChangeBlockReward());
       _;
     }
 
@@ -27,12 +33,16 @@ contract BlockRewardStorage is EternalStorage {
       return boolStorage[keccak256(abi.encodePacked("isInitialized"))];
     }
 
-    function setReward(uint256 _reward) public onlyOwner {
+    function setReward(uint256 _reward) public onlyOwnerOrVotingToChange {
       require(_reward >= 0);
       uintStorage[keccak256(abi.encodePacked("reward"))] = _reward;
     }
 
     function getReward() public view returns(uint256) {
       return uintStorage[keccak256(abi.encodePacked("reward"))];
+    }
+
+    function getProxyStorage() public view returns(address) {
+      return addressStorage[keccak256(abi.encodePacked("proxyStorage"))];
     }
 }

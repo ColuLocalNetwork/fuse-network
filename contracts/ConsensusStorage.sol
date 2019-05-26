@@ -1,6 +1,7 @@
 pragma solidity ^0.4.24;
 
 import "./eternal-storage/EternalStorage.sol";
+import "./ProxyStorage.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract ConsensusStorage is EternalStorage {
@@ -8,6 +9,11 @@ contract ConsensusStorage is EternalStorage {
 
     modifier onlyOwner() {
       require(msg.sender == addressStorage[keccak256(abi.encodePacked("owner"))]);
+      _;
+    }
+
+    modifier onlyOwnerOrVotingToChange() {
+      require(msg.sender == addressStorage[keccak256(abi.encodePacked("owner"))] || msg.sender == ProxyStorage(getProxyStorage()).getVotingToChangeMinStake());
       _;
     }
 
@@ -35,7 +41,7 @@ contract ConsensusStorage is EternalStorage {
       return boolStorage[keccak256(abi.encodePacked("isInitialized"))];
     }
 
-    function setMinStake(uint256 _minStake) public onlyOwner {
+    function setMinStake(uint256 _minStake) public onlyOwnerOrVotingToChange {
       require(_minStake > 0);
       uintStorage[keccak256(abi.encodePacked("minStake"))] = _minStake;
     }

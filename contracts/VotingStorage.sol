@@ -194,7 +194,7 @@ contract VotingStorage is EternalStorage, VotingEnums {
     return getBallotsStorage().getBallotThreshold(uint256(ThresholdTypes.Voters));
   }
 
-  function getGlobalMinBlockReward() public view returns(uint256) {
+  function getGlobalBlockReward() public view returns(uint256) {
     return getBallotsStorage().getBallotThreshold(uint256(ThresholdTypes.BlockReward));
   }
 

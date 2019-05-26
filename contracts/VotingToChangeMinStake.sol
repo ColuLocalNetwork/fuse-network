@@ -32,7 +32,9 @@ contract VotingToChangeMinStake is Voting {
   }
 
   function finalizeBallotInner(uint256 _id) internal returns(bool) {
-    return getBallotsStorage().setBallotThreshold(getProposedValue(_id), uint256(ThresholdTypes.MinStake));
+    uint256 proposedValue = getProposedValue(_id);
+    return getBallotsStorage().setBallotThreshold(proposedValue, uint256(ThresholdTypes.MinStake));
+    Consensus(ProxyStorage(getProxyStorage()).getConsensus()).setMinStake(proposedValue);
     return true;
   }
 

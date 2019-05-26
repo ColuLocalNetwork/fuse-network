@@ -1,6 +1,8 @@
 pragma solidity ^0.4.24;
 
 import "./Voting.sol";
+import "./ProxyStorage.sol";
+import "./BlockReward.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 contract VotingToChangeBlockReward is Voting {
@@ -13,7 +15,7 @@ contract VotingToChangeBlockReward is Voting {
 
   function newBallot(uint256 _startTime, uint256 _endTime, uint256 _proposedValue, string _description) public {
     require(_proposedValue >= getMinPossibleBlockReward());
-    require(_proposedValue != getGlobalMinBlockReward());
+    require(_proposedValue != getGlobalBlockReward());
     uint256 ballotId = super.createBallot(uint256(BallotTypes.BlockReward), _startTime, _endTime, _description);
     setProposedValue(ballotId, _proposedValue);
   }
@@ -32,7 +34,9 @@ contract VotingToChangeBlockReward is Voting {
   }
 
   function finalizeBallotInner(uint256 _id) internal returns(bool) {
-    return getBallotsStorage().setBallotThreshold(getProposedValue(_id), uint256(ThresholdTypes.BlockReward));
+    uint256 proposedValue = getProposedValue(_id);
+    getBallotsStorage().setBallotThreshold(proposedValue, uint256(ThresholdTypes.BlockReward));
+    BlockReward(ProxyStorage(getProxyStorage()).getBlockReward()).setReward(proposedValue);
     return true;
   }
 

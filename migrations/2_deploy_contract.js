@@ -21,6 +21,8 @@ const {
   BLOCK_REWARD_GWEI,
   BALLOT_THRESHOLDS,
   MIN_BALLOT_DURATION_SECONDS,
+  MIN_POSSIBLE_BLOCK_REWARD_GWEI,
+  MIN_POSSIBLE_STAKE_GWEI,
   MIN_POSSIBLE_THRESHOLD,
   SAVE_TO_FILE
 } = process.env
@@ -30,9 +32,19 @@ module.exports = function(deployer, network, accounts) {
     let initialValidatorAddress = INITIAL_VALIDATOR_ADDRESS || ZERO_ADDRESS
     let minStake = toWei(toBN(MIN_STAKE_GWEI || 0), 'gwei')
     let blockRewardAmount = toWei(toBN(BLOCK_REWARD_GWEI || 0), 'gwei')
-    let ballotsThresholds = BALLOT_THRESHOLDS ? BALLOT_THRESHOLDS.split(',') : [3]
     let minBallotDuration = MIN_BALLOT_DURATION_SECONDS || 172800
+    let minPossibleBlockReward = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_GWEI || 0), 'gwei')
+    let minPossibleStake = toWei(toBN(MIN_POSSIBLE_STAKE_GWEI || 0), 'gwei')
     let minPossibleThreshold = MIN_POSSIBLE_THRESHOLD || 3
+    let ballotsThresholds = [minPossibleThreshold, minPossibleBlockReward, minPossibleStake]
+    if (BALLOT_THRESHOLDS) {
+      let arr = BALLOT_THRESHOLDS.split(',')
+      ballotsThresholds = [
+        arr[0],
+        toWei(toBN(arr[1]), 'gwei'),
+        toWei(toBN(arr[2]), 'gwei')
+      ]
+    }
 
     let proxy
     let ballotsStorage, ballotsStorageImpl
@@ -74,13 +86,13 @@ module.exports = function(deployer, network, accounts) {
       votingToChangeBlockRewardImpl = await VotingToChangeBlockReward.new()
       proxy = await EternalStorageProxy.new(proxyStorage.address, votingToChangeBlockRewardImpl.address)
       votingToChangeBlockReward = await VotingToChangeBlockReward.at(proxy.address)
-      await votingToChangeBlockReward.initialize(minBallotDuration, minPossibleThreshold)
+      await votingToChangeBlockReward.initialize(minBallotDuration, minPossibleBlockReward)
 
       // VotingToChangeMinStake
       votingToChangeMinStakeImpl = await VotingToChangeMinStake.new()
       proxy = await EternalStorageProxy.new(proxyStorage.address, votingToChangeMinStakeImpl.address)
       votingToChangeMinStake = await VotingToChangeMinStake.at(proxy.address)
-      await votingToChangeMinStake.initialize(minBallotDuration, minPossibleThreshold)
+      await votingToChangeMinStake.initialize(minBallotDuration, minPossibleStake)
 
       // VotingToChangeMinThreshold
       votingToChangeMinThresholdImpl = await VotingToChangeMinThreshold.new()
