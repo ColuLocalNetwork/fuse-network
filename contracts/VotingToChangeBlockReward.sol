@@ -1,7 +1,6 @@
 pragma solidity ^0.4.24;
 
 import "./Voting.sol";
-import "./ProxyStorage.sol";
 import "./BlockReward.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 

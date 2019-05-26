@@ -6,7 +6,7 @@ const BlockReward = artifacts.require('./BlockReward.sol')
 const VotingToChangeBlockReward = artifacts.require('./VotingToChangeBlockReward.sol')
 const VotingToChangeMinStake = artifacts.require('./VotingToChangeMinStake.sol')
 const VotingToChangeMinThreshold = artifacts.require('./VotingToChangeMinThreshold.sol')
-// const VotingToChangeProxyAddress = artifacts.require('./VotingToChangeProxyAddress.sol') // TODO uncomment
+const VotingToChangeProxyAddress = artifacts.require('./VotingToChangeProxyAddress.sol')
 const {ERROR_MSG, ZERO_AMOUNT, ZERO_ADDRESS, RANDOM_ADDRESS} = require('./helpers')
 const {toBN, toWei, toChecksumAddress} = web3.utils
 
@@ -53,11 +53,10 @@ contract('ProxyStorage', async (accounts) => {
     proxy = await EternalStorageProxy.new(proxyStorage.address, votingToChangeMinThresholdImpl.address)
     votingToChangeMinThreshold = await VotingToChangeMinThreshold.at(proxy.address)
 
-    // TODO uncomment
     // VotingToChangeProxyAddress
-    // votingToChangeProxyImpl = await VotingToChangeProxyAddress.new()
-    // proxy = await EternalStorageProxy.new(proxyStorage.address, votingToChangeProxyImpl.address)
-    // votingToChangeProxy = await VotingToChangeProxyAddress.at(proxy.address)
+    votingToChangeProxyImpl = await VotingToChangeProxyAddress.new()
+    proxy = await EternalStorageProxy.new(proxyStorage.address, votingToChangeProxyImpl.address)
+    votingToChangeProxy = await VotingToChangeProxyAddress.at(proxy.address)
   })
 
   describe('initialize', async () => {
@@ -79,7 +78,7 @@ contract('ProxyStorage', async (accounts) => {
         votingToChangeBlockReward.address,
         votingToChangeMinStake.address,
         votingToChangeMinThreshold.address,
-        ZERO_ADDRESS, // votingToChangeProxy.address, // TODO uncomment
+        votingToChangeProxy.address,
         {from: nonOwner}
       ).should.be.rejectedWith(ERROR_MSG)
     })
@@ -90,7 +89,7 @@ contract('ProxyStorage', async (accounts) => {
         votingToChangeBlockReward.address,
         votingToChangeMinStake.address,
         votingToChangeMinThreshold.address,
-        ZERO_ADDRESS, // votingToChangeProxy.address, // TODO uncomment
+        votingToChangeProxy.address,
         {from: owner}
       ).should.be.fulfilled
       logs.length.should.be.equal(1)
@@ -101,7 +100,7 @@ contract('ProxyStorage', async (accounts) => {
       logs[0].args.votingToChangeBlockReward.should.be.equal(votingToChangeBlockReward.address)
       logs[0].args.votingToChangeMinStake.should.be.equal(votingToChangeMinStake.address)
       logs[0].args.votingToChangeMinThreshold.should.be.equal(votingToChangeMinThreshold.address)
-      // logs[0].args.votingToChangeProxy.should.be.equal(votingToChangeProxy.address) // TODO uncomment
+      logs[0].args.votingToChangeProxy.should.be.equal(votingToChangeProxy.address)
 
       consensus.address.should.be.equal(await proxyStorage.getConsensus())
       blockReward.address.should.be.equal(await proxyStorage.getBlockReward())
@@ -109,7 +108,7 @@ contract('ProxyStorage', async (accounts) => {
       votingToChangeBlockReward.address.should.be.equal(await proxyStorage.getVotingToChangeBlockReward())
       votingToChangeMinStake.address.should.be.equal(await proxyStorage.getVotingToChangeMinStake())
       votingToChangeMinThreshold.address.should.be.equal(await proxyStorage.getVotingToChangeMinThreshold())
-      // votingToChangeProxy.address.should.be.equal(await proxyStorage.getVotingToChangeProxy()) // TODO uncomment
+      votingToChangeProxy.address.should.be.equal(await proxyStorage.getVotingToChangeProxy())
     })
     it('should not be called twice', async () => {
       await proxyStorage.initializeAddresses(
@@ -118,7 +117,7 @@ contract('ProxyStorage', async (accounts) => {
         votingToChangeBlockReward.address,
         votingToChangeMinStake.address,
         votingToChangeMinThreshold.address,
-        ZERO_ADDRESS, // votingToChangeProxy.address, // TODO uncomment
+        votingToChangeProxy.address,
         {from: owner}
       ).should.be.fulfilled
 
@@ -128,7 +127,7 @@ contract('ProxyStorage', async (accounts) => {
         votingToChangeBlockReward.address,
         votingToChangeMinStake.address,
         votingToChangeMinThreshold.address,
-        ZERO_ADDRESS, // votingToChangeProxy.address, // TODO uncomment
+        votingToChangeProxy.address,
         {from: owner}
       ).should.be.rejectedWith(ERROR_MSG)
     })
@@ -154,7 +153,7 @@ contract('ProxyStorage', async (accounts) => {
         votingToChangeBlockReward.address,
         votingToChangeMinStake.address,
         votingToChangeMinThreshold.address,
-        ZERO_ADDRESS, // votingToChangeProxy.address, // TODO uncomment
+        votingToChangeProxy.address,
         {from: owner}
       ).should.be.fulfilled
     })
