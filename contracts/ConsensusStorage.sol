@@ -46,7 +46,7 @@ contract ConsensusStorage is EternalStorage {
       uintStorage[keccak256(abi.encodePacked("minStake"))] = _minStake;
     }
 
-    function minStake() public view returns(uint256) {
+    function getMinStake() public view returns(uint256) {
       return uintStorage[keccak256(abi.encodePacked("minStake"))];
     }
 

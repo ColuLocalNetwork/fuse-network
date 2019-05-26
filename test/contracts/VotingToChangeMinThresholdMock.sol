@@ -19,8 +19,4 @@ contract VotingToChangeMinThresholdMock is VotingToChangeMinThreshold {
       return time;
     }
   }
-
-  function setMinBallotDurationMock(uint256 _value) public {
-    uintStorage[keccak256(abi.encodePacked("minBallotDuration"))] = _value;
-  }
 }

@@ -34,7 +34,6 @@ contract VotingToChangeMinThreshold is Voting {
 
   function finalizeBallotInner(uint256 _id) internal returns(bool) {
     return getBallotsStorage().setBallotThreshold(getProposedValue(_id), uint256(ThresholdTypes.Voters));
-    return true;
   }
 
   function getMinPossibleThreshold() public view returns(uint256) {

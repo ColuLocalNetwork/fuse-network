@@ -35,9 +35,8 @@ contract VotingToChangeBlockReward is Voting {
 
   function finalizeBallotInner(uint256 _id) internal returns(bool) {
     uint256 proposedValue = getProposedValue(_id);
-    getBallotsStorage().setBallotThreshold(proposedValue, uint256(ThresholdTypes.BlockReward));
     BlockReward(ProxyStorage(getProxyStorage()).getBlockReward()).setReward(proposedValue);
-    return true;
+    return getBallotsStorage().setBallotThreshold(proposedValue, uint256(ThresholdTypes.BlockReward));
   }
 
   function getMinPossibleBlockReward() public view returns(uint256) {

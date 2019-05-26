@@ -1,10 +1,9 @@
 const moment = require('moment')
 const Consensus = artifacts.require('ConsensusMock.sol')
-const BlockReward = artifacts.require('BlockReward.sol')
 const ProxyStorage = artifacts.require('ProxyStorageMock.sol')
 const EternalStorageProxy = artifacts.require('EternalStorageProxyMock.sol')
 const BallotsStorage = artifacts.require('BallotsStorage.sol')
-const Voting = artifacts.require('VotingToChangeBlockRewardMock.sol')
+const Voting = artifacts.require('VotingToChangeMinStakeMock.sol')
 const {ERROR_MSG, ZERO_AMOUNT, ZERO_ADDRESS} = require('./helpers')
 const {toBN, toWei, toChecksumAddress} = web3.utils
 
@@ -23,8 +22,8 @@ const GLOBAL_VALUES = {
 const BALLOTS_THRESHOLDS = [GLOBAL_VALUES.VOTERS, GLOBAL_VALUES.BLOCK_REWARD, GLOBAL_VALUES.MIN_STAKE]
 
 const MIN_BALLOT_DURATION_SECONDS = 172800 // 2 days
-const MIN_POSSIBLE_BLOCK_REWARD_ETH = 10
-const MIN_POSSIBLE_BLOCK_REWARD = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH), 'ether')
+const MIN_POSSIBLE_STAKE_ETH = 10
+const MIN_POSSIBLE_STAKE = toWei(toBN(MIN_POSSIBLE_STAKE_ETH), 'ether')
 
 const BALLOT_TYPES = {
   INVALID: 0,
@@ -49,16 +48,16 @@ const ACTION_CHOICE = {
 
 let VOTING_START_TIME, VOTING_END_TIME
 
-contract('VotingToChangeBlockReward', async (accounts) => {
+contract('VotingToChangeMinStake', async (accounts) => {
   let proxy
   let ballotsStorageImpl, ballotsStorage
-  let blockRewardImpl, blockReward
   let votingImpl, voting
   let owner = accounts[0]
   let votingKeys = [accounts[1], accounts[2], accounts[3], accounts[4], accounts[5], accounts[6], accounts[7], accounts[8]]
-  let votingToChangeMinStake = accounts[9]
-  let votingToChangeMinThreshold = accounts[10]
-  let votingToChangeProxy = accounts[11]
+  let blockReward = accounts[9]
+  let votingToChangeBlockReward = accounts[10]
+  let votingToChangeMinThreshold = accounts[11]
+  let votingToChangeProxy = accounts[12]
 
   beforeEach(async () => {
     // Consensus
@@ -80,23 +79,17 @@ contract('VotingToChangeBlockReward', async (accounts) => {
     ballotsStorage = await BallotsStorage.at(proxy.address)
     await ballotsStorage.initialize(BALLOTS_THRESHOLDS)
 
-    // BlockReward
-    blockRewardImpl = await BlockReward.new()
-    proxy = await EternalStorageProxy.new(proxyStorage.address, blockRewardImpl.address)
-    blockReward = await BlockReward.at(proxy.address)
-    await blockReward.initialize(GLOBAL_VALUES.BLOCK_REWARD)
-
-    // VotingToChangeBlockReward
+    // VotingToChangeMinStake
     votingImpl = await Voting.new()
     proxy = await EternalStorageProxy.new(proxyStorage.address, votingImpl.address)
     voting = await Voting.at(proxy.address)
 
     // Initialize ProxyStorage
     await proxyStorage.initializeAddresses(
-      blockReward.address,
+      blockReward,
       ballotsStorage.address,
+      votingToChangeBlockReward,
       voting.address,
-      votingToChangeMinStake,
       votingToChangeMinThreshold,
       votingToChangeProxy
     )
@@ -124,25 +117,25 @@ contract('VotingToChangeBlockReward', async (accounts) => {
 
   describe('initialize', async () => {
     it('should be successful', async () => {
-      await voting.initialize(MIN_BALLOT_DURATION_SECONDS, MIN_POSSIBLE_BLOCK_REWARD).should.be.fulfilled
+      await voting.initialize(MIN_BALLOT_DURATION_SECONDS, MIN_POSSIBLE_STAKE).should.be.fulfilled
       toBN(MIN_BALLOT_DURATION_SECONDS).should.be.bignumber.equal(await voting.getMinBallotDuration())
-      toBN(MIN_POSSIBLE_BLOCK_REWARD).should.be.bignumber.equal(await voting.getMinPossibleBlockReward())
+      toBN(MIN_POSSIBLE_STAKE).should.be.bignumber.equal(await voting.getMinPossibleStake())
     })
     it('should fail if min ballot duration is bigger than max ballot duration', async () => {
       let maxBallotDuration = await voting.getMaxBallotDuration()
-      await voting.initialize(maxBallotDuration.add(toBN(1)), MIN_POSSIBLE_BLOCK_REWARD).should.be.rejectedWith(ERROR_MSG)
+      await voting.initialize(maxBallotDuration.add(toBN(1)), MIN_POSSIBLE_STAKE).should.be.rejectedWith(ERROR_MSG)
     })
   })
 
   describe('newBallot', async () => {
     beforeEach(async () => {
-      await voting.initialize(MIN_BALLOT_DURATION_SECONDS, MIN_POSSIBLE_BLOCK_REWARD).should.be.fulfilled
+      await voting.initialize(MIN_BALLOT_DURATION_SECONDS, MIN_POSSIBLE_STAKE).should.be.fulfilled
       VOTING_START_TIME = moment.utc().add(30, 'seconds').unix()
       VOTING_END_TIME = moment.utc().add(10, 'days').unix()
     })
     it('should be successful', async () => {
       let id = await voting.getNextBallotId()
-      let proposedValue = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH + 1), 'ether')
+      let proposedValue = toWei(toBN(MIN_POSSIBLE_STAKE_ETH + 1), 'ether')
       let {logs} = await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
       logs.length.should.be.equal(1)
       logs[0].event.should.be.equal('BallotCreated')
@@ -164,11 +157,11 @@ contract('VotingToChangeBlockReward', async (accounts) => {
     })
     it('should fail if not called by valid voting key', async () => {
       let nonVotingKey = owner
-      let proposedValue = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH + 1), 'ether')
+      let proposedValue = toWei(toBN(MIN_POSSIBLE_STAKE_ETH + 1), 'ether')
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: nonVotingKey}).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if times are invalid', async () => {
-      let proposedValue = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH + 1), 'ether')
+      let proposedValue = toWei(toBN(MIN_POSSIBLE_STAKE_ETH + 1), 'ether')
 
       // require(_startTime > 0 && _endTime > 0);
       VOTING_START_TIME = 0
@@ -198,16 +191,16 @@ contract('VotingToChangeBlockReward', async (accounts) => {
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if proposed value is invalid', async () => {
-      // require(_proposedValue >= getMinPossibleBlockReward());
-      let proposedValue = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH - 1), 'ether')
+      // require(_proposedValue >= getMinPossibleStake());
+      let proposedValue = toWei(toBN(MIN_POSSIBLE_STAKE_ETH - 1), 'ether')
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
 
-      // require(_proposedValue != getGlobalBlockReward());
-      proposedValue = await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.BLOCK_REWARD)
+      // require(_proposedValue != getGlobalMinStake());
+      proposedValue = await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.MIN_STAKE)
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
     })
-    it('should fail if proposed value is same as current value (THRESHOLD_TYPES.BLOCK_REWARD)', async () => {
-      let proposedValue = GLOBAL_VALUES.BLOCK_REWARD
+    it('should fail if proposed value is same as current value (THRESHOLD_TYPES.MIN_STAKE)', async () => {
+      let proposedValue = GLOBAL_VALUES.MIN_STAKE
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if creating ballot over the ballots limit', async () => {
@@ -216,7 +209,7 @@ contract('VotingToChangeBlockReward', async (accounts) => {
       let ballotLimitPerValidator = (await ballotsStorage.getBallotLimitPerValidator()).toNumber()
       ballotLimitPerValidator.should.be.equal(Math.floor(maxLimitBallot / validatorsCount))
       // create ballots successfully up to the limit
-      let proposedValue = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH + 1), 'ether')
+      let proposedValue = toWei(toBN(MIN_POSSIBLE_STAKE_ETH + 1), 'ether')
       for (let i = 0; i < ballotLimitPerValidator; i++) {
         let {logs} = await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
       }
@@ -230,11 +223,11 @@ contract('VotingToChangeBlockReward', async (accounts) => {
   describe('vote', async () => {
     let id, proposedValue
     beforeEach(async () => {
-      await voting.initialize(MIN_BALLOT_DURATION_SECONDS, MIN_POSSIBLE_BLOCK_REWARD).should.be.fulfilled
+      await voting.initialize(MIN_BALLOT_DURATION_SECONDS, MIN_POSSIBLE_STAKE).should.be.fulfilled
       VOTING_START_TIME = moment.utc().add(30, 'seconds').unix()
       VOTING_END_TIME = moment.utc().add(10, 'days').unix()
       id = await voting.getNextBallotId()
-      proposedValue = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH + 1), 'ether')
+      proposedValue = toWei(toBN(MIN_POSSIBLE_STAKE_ETH + 1), 'ether')
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
     })
     it('should vote "accept" successfully', async () => {
@@ -311,13 +304,13 @@ contract('VotingToChangeBlockReward', async (accounts) => {
 
   describe('finalize', async () => {
     beforeEach(async () => {
-      await voting.initialize(MIN_BALLOT_DURATION_SECONDS, MIN_POSSIBLE_BLOCK_REWARD).should.be.fulfilled
+      await voting.initialize(MIN_BALLOT_DURATION_SECONDS, MIN_POSSIBLE_STAKE).should.be.fulfilled
       VOTING_START_TIME = moment.utc().add(30, 'seconds').unix()
       VOTING_END_TIME = moment.utc().add(10, 'days').unix()
     })
     it('should change to proposed value successfully if quorum is reached', async () => {
       let id = await voting.getNextBallotId()
-      let proposedValue = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH + 1), 'ether')
+      let proposedValue = toWei(toBN(MIN_POSSIBLE_STAKE_ETH + 1), 'ether')
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
       await voting.setTime(VOTING_START_TIME)
       await voting.vote(id, ACTION_CHOICE.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
@@ -344,12 +337,12 @@ contract('VotingToChangeBlockReward', async (accounts) => {
       ballotInfo.alreadyVoted.should.be.equal(true)
       toBN(QUORUM_STATES.ACCEPTED).should.be.bignumber.equal(await voting.getQuorumState(id))
       toBN(0).should.be.bignumber.equal(await voting.getIndex(id))
-      proposedValue.should.be.bignumber.equal(await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.BLOCK_REWARD))
-      proposedValue.should.be.bignumber.equal(await blockReward.getReward())
+      proposedValue.should.be.bignumber.equal(await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.MIN_STAKE))
+      proposedValue.should.be.bignumber.equal(await consensus.getMinStake())
     })
     it('should not change to proposed value if quorum is not reached', async () => {
       let id = await voting.getNextBallotId()
-      let proposedValue = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH + 1), 'ether')
+      let proposedValue = toWei(toBN(MIN_POSSIBLE_STAKE_ETH + 1), 'ether')
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
       await voting.setTime(VOTING_START_TIME)
       await voting.vote(id, ACTION_CHOICE.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
@@ -375,12 +368,12 @@ contract('VotingToChangeBlockReward', async (accounts) => {
       ballotInfo.alreadyVoted.should.be.equal(true)
       toBN(QUORUM_STATES.REJECTED).should.be.bignumber.equal(await voting.getQuorumState(id))
       toBN(0).should.be.bignumber.equal(await voting.getIndex(id))
-      proposedValue.should.not.be.bignumber.equal(await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.BLOCK_REWARD))
-      proposedValue.should.not.be.bignumber.equal(await blockReward.getReward())
+      proposedValue.should.not.be.bignumber.equal(await ballotsStorage.getBallotThreshold(THRESHOLD_TYPES.MIN_STAKE))
+      proposedValue.should.not.be.bignumber.equal(await consensus.getMinStake())
     })
     it('should fail if trying to finalize twice', async () => {
       let id = await voting.getNextBallotId()
-      let proposedValue = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH + 1), 'ether')
+      let proposedValue = toWei(toBN(MIN_POSSIBLE_STAKE_ETH + 1), 'ether')
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
       await voting.setTime(VOTING_START_TIME)
       await voting.vote(id, ACTION_CHOICE.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
@@ -392,7 +385,7 @@ contract('VotingToChangeBlockReward', async (accounts) => {
     })
     it('should be allowed after all possible voters have voted even if end time not passed', async () => {
       let id = await voting.getNextBallotId()
-      let proposedValue = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH + 1), 'ether')
+      let proposedValue = toWei(toBN(MIN_POSSIBLE_STAKE_ETH + 1), 'ether')
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
       await voting.setTime(VOTING_START_TIME + MIN_BALLOT_DURATION_SECONDS + 1)
       await voting.vote(id, ACTION_CHOICE.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
@@ -407,7 +400,7 @@ contract('VotingToChangeBlockReward', async (accounts) => {
     })
     it('should be allowed after end time has passed even if not all voters have voted', async () => {
       let id = await voting.getNextBallotId()
-      let proposedValue = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH + 1), 'ether')
+      let proposedValue = toWei(toBN(MIN_POSSIBLE_STAKE_ETH + 1), 'ether')
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
       await voting.setTime(VOTING_END_TIME + 1)
       await voting.finalize(id, {from: votingKeys[0]}).should.be.fulfilled
@@ -415,7 +408,7 @@ contract('VotingToChangeBlockReward', async (accounts) => {
     it('should fail if not called by valid voting key', async () => {
       let nonVotingKey = owner
       let id = await voting.getNextBallotId()
-      let proposedValue = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH + 1), 'ether')
+      let proposedValue = toWei(toBN(MIN_POSSIBLE_STAKE_ETH + 1), 'ether')
       await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
       await voting.setTime(VOTING_END_TIME + 1)
       await voting.finalize(id, {from: nonVotingKey}).should.be.rejectedWith(ERROR_MSG)
@@ -460,7 +453,7 @@ contract('VotingToChangeBlockReward', async (accounts) => {
       await proxy.setProxyStorageMock(proxyStorage.address)
       votingNew = await Voting.at(proxy.address)
       false.should.be.equal(await votingNew.isInitialized())
-      await votingNew.initialize(MIN_BALLOT_DURATION_SECONDS, MIN_POSSIBLE_BLOCK_REWARD).should.be.fulfilled
+      await votingNew.initialize(MIN_BALLOT_DURATION_SECONDS, MIN_POSSIBLE_STAKE).should.be.fulfilled
       true.should.be.equal(await votingNew.isInitialized())
     })
     it('should use same proxyStorage after upgrade', async () => {
@@ -470,12 +463,12 @@ contract('VotingToChangeBlockReward', async (accounts) => {
       proxyStorageStub.should.be.equal(await votingNew.getProxyStorage())
     })
     it('should use same storage after upgrade', async () => {
-      let newValue = toWei(toBN(MIN_POSSIBLE_BLOCK_REWARD_ETH + 1), 'ether')
-      await voting.setMinPossibleBlockRewardMock(newValue)
+      let newValue = toWei(toBN(MIN_POSSIBLE_STAKE_ETH + 1), 'ether')
+      await voting.setMinPossibleStakeMock(newValue)
       await proxy.setProxyStorageMock(proxyStorageStub)
       await proxy.upgradeTo(votingNew.address, {from: proxyStorageStub})
       votingNew = await Voting.at(proxy.address)
-      toBN(newValue).should.be.bignumber.equal(await votingNew.getMinPossibleBlockReward())
+      toBN(newValue).should.be.bignumber.equal(await votingNew.getMinPossibleStake())
     })
   })
 })

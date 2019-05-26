@@ -83,7 +83,7 @@ contract Consensus is ConsensusStorage, ValidatorSet {
 
     stakeAmountAdd(_staker, _amount);
 
-    if (stakeAmount(_staker) >= minStake()) {
+    if (stakeAmount(_staker) >= getMinStake()) {
       _addValidator(_staker);
     }
   }
@@ -94,7 +94,7 @@ contract Consensus is ConsensusStorage, ValidatorSet {
     setIsValidator(_validator, true);
     setIsValidatorFinalized(_validator, false);
 
-    uint256 stakeMultiplier = stakeAmount(_validator).div(minStake());
+    uint256 stakeMultiplier = stakeAmount(_validator).div(getMinStake());
     uint256 currentAppearances = validatorIndexesLength(_validator);
     uint256 appearencesToAdd = stakeMultiplier.sub(currentAppearances);
 
@@ -111,7 +111,7 @@ contract Consensus is ConsensusStorage, ValidatorSet {
   function _removeValidator(address _validator) internal {
     require (_validator != address(0));
 
-    uint256 stakeMultiplier = stakeAmount(_validator).div(minStake());
+    uint256 stakeMultiplier = stakeAmount(_validator).div(getMinStake());
     uint256 currentAppearances = validatorIndexesLength(_validator);
     uint256 appearencesToRemove = currentAppearances.sub(stakeMultiplier);
 
