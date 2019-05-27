@@ -4,15 +4,8 @@ const ProxyStorage = artifacts.require('ProxyStorageMock.sol')
 const EternalStorageProxy = artifacts.require('EternalStorageProxyMock.sol')
 const BallotsStorage = artifacts.require('BallotsStorage.sol')
 const Voting = artifacts.require('VotingToChangeMinStakeMock.sol')
-const {ERROR_MSG, ZERO_AMOUNT, ZERO_ADDRESS} = require('./helpers')
+const {ERROR_MSG, ZERO_AMOUNT, ZERO_ADDRESS, THRESHOLD_TYPES} = require('./helpers')
 const {toBN, toWei, toChecksumAddress} = web3.utils
-
-const THRESHOLD_TYPES = {
-  INVALID: 0,
-  VOTERS: 1,
-  BLOCK_REWARD: 2,
-  MIN_STAKE: 3
-}
 
 const GLOBAL_VALUES = {
   VOTERS: 3,

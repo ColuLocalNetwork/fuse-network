@@ -8,15 +8,8 @@ const VotingToChangeBlockReward = artifacts.require('VotingToChangeBlockReward.s
 const VotingToChangeMinStake = artifacts.require('VotingToChangeMinStake.sol')
 const VotingToChangeMinThreshold = artifacts.require('VotingToChangeMinThreshold.sol')
 const Voting = artifacts.require('VotingToChangeProxyAddressMock.sol')
-const {ERROR_MSG, ZERO_ADDRESS, RANDOM_ADDRESS} = require('./helpers')
+const {ERROR_MSG, ZERO_ADDRESS, RANDOM_ADDRESS, THRESHOLD_TYPES, CONTRACT_TYPES} = require('./helpers')
 const {toBN, toWei, toChecksumAddress} = web3.utils
-
-const THRESHOLD_TYPES = {
-  INVALID: 0,
-  VOTERS: 1,
-  BLOCK_REWARD: 2,
-  MIN_STAKE: 3
-}
 
 const GLOBAL_VALUES = {
   VOTERS: 3,
@@ -48,22 +41,10 @@ const ACTION_CHOICE = {
   REJECT: 2
 }
 
-const CONTRACT_TYPES = {
-  INVALID: 0,
-  CONSENSUS: 1,
-  BLOCK_REWARD: 2,
-  BALLOTS_STORAGE: 3,
-  PROXY_STORAGE: 4,
-  VOTING_TO_CHANGE_BLOCK_REWARD: 5,
-  VOTING_TO_CHANGE_MIN_STAKE: 6,
-  VOTING_TO_CHANGE_MIN_THRESHOLD: 7,
-  VOTING_TO_CHANGE_PROXY: 8
-}
-
 let VOTING_START_TIME, VOTING_END_TIME
 
 contract('VotingToChangeProxyAddress', async (accounts) => {
-  let proxy, proxyStorage
+  let consensus, proxy, proxyStorage, ballotsStorage
   let votingImpl, voting
   let owner = accounts[0]
   let votingKeys = [accounts[1], accounts[2], accounts[3], accounts[4], accounts[5], accounts[6], accounts[7], accounts[8]]
@@ -72,7 +53,7 @@ contract('VotingToChangeProxyAddress', async (accounts) => {
     // Consensus
     let consensusImpl = await Consensus.new()
     proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
-    let consensus = await Consensus.at(proxy.address)
+    consensus = await Consensus.at(proxy.address)
     await consensus.initialize(toWei(toBN(10000), 'ether'), owner)
 
     // ProxyStorage
@@ -85,7 +66,7 @@ contract('VotingToChangeProxyAddress', async (accounts) => {
     // BallotsStorage
     let ballotsStorageImpl = await BallotsStorage.new()
     proxy = await EternalStorageProxy.new(proxyStorage.address, ballotsStorageImpl.address)
-    let ballotsStorage = await BallotsStorage.at(proxy.address)
+    ballotsStorage = await BallotsStorage.at(proxy.address)
     await ballotsStorage.initialize(BALLOTS_THRESHOLDS)
 
     // BlockReward

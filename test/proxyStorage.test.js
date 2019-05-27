@@ -7,7 +7,7 @@ const VotingToChangeBlockReward = artifacts.require('VotingToChangeBlockReward.s
 const VotingToChangeMinStake = artifacts.require('VotingToChangeMinStake.sol')
 const VotingToChangeMinThreshold = artifacts.require('VotingToChangeMinThreshold.sol')
 const VotingToChangeProxyAddress = artifacts.require('VotingToChangeProxyAddress.sol')
-const {ERROR_MSG, ZERO_AMOUNT, ZERO_ADDRESS, RANDOM_ADDRESS} = require('./helpers')
+const {ERROR_MSG, ZERO_AMOUNT, ZERO_ADDRESS, RANDOM_ADDRESS, CONTRACT_TYPES} = require('./helpers')
 const {toBN, toWei, toChecksumAddress} = web3.utils
 
 contract('ProxyStorage', async (accounts) => {
@@ -133,51 +133,6 @@ contract('ProxyStorage', async (accounts) => {
     })
   })
 
-  describe('setContractAddress', async () => {
-    const CONTRACT_TYPES = {
-      INVALID: 0,
-      CONSENSUS: 1,
-      BLOCK_REWARD: 2,
-      BALLOTS_STORAGE: 3,
-      PROXY_STORAGE: 4,
-      VOTING_TO_CHANGE_BLOCK_REWARD: 5,
-      VOTING_TO_CHANGE_MIN_STAKE: 6,
-      VOTING_TO_CHANGE_MIN_THRESHOLD: 7,
-      VOTING_TO_CHANGE_PROXY: 8
-    }
-    beforeEach(async () => {
-      await proxyStorage.initialize(consensus.address)
-      await proxyStorage.initializeAddresses(
-        blockReward.address,
-        ballotsStorage.address,
-        votingToChangeBlockReward.address,
-        votingToChangeMinStake.address,
-        votingToChangeMinThreshold.address,
-        votingToChangeProxy.address,
-        {from: owner}
-      ).should.be.fulfilled
-    })
-    it.skip('should only be called by votingToChangeProxy', async () => { // TODO make it work
-      await proxyStorage.setContractAddress(CONTRACT_TYPES.CONSENSUS, RANDOM_ADDRESS, {from: owner}).should.be.rejectedWith(ERROR_MSG)
-      await proxyStorage.setVotingToChangeProxyAddress(owner)
-      let {logs} = await proxyStorage.setContractAddress(CONTRACT_TYPES.CONSENSUS, RANDOM_ADDRESS, {from: owner})
-      logs.length.should.be.equal(1)
-      logs[0].event.should.be.equal('AddressSet')
-      logs[0].args['contractType'].should.be.bignumber.equal(toBN(CONTRACT_TYPES.CONSENSUS))
-      logs[0].args['contractAddress'].should.be.equal(RANDOM_ADDRESS)
-    })
-    it('should not be able to set 0x0 address', async () => {
-      await proxyStorage.setVotingToChangeProxyAddress(owner)
-      let {logs} = await proxyStorage.setContractAddress(CONTRACT_TYPES.CONSENSUS, ZERO_ADDRESS, {from: owner})
-      logs.length.should.be.equal(0)
-    })
-    it('should not be able to set "Invalid" contract type', async () => {
-      await proxyStorage.setVotingToChangeProxyAddress(owner)
-      let {logs} = await proxyStorage.setContractAddress(CONTRACT_TYPES.INVALID, RANDOM_ADDRESS, {from: owner})
-      logs.length.should.be.equal(0)
-    })
-  })
-
   describe('upgradeTo', async () => {
     let proxyStorageNew
     let proxyStorageStub = accounts[8]
@@ -210,12 +165,6 @@ contract('ProxyStorage', async (accounts) => {
       false.should.be.equal(await proxyStorageNew.isInitialized())
       await proxyStorageNew.initialize(consensus.address).should.be.fulfilled
       true.should.be.equal(await proxyStorageNew.isInitialized())
-    })
-    it.skip('should use same storage after upgrade', async () => { // TODO make it work
-      await proxyStorage.setConsensusMock(RANDOM_ADDRESS)
-      await proxy.upgradeTo(proxyStorageNew.address, {from: proxyStorageStub})
-      proxyStorageNew = await ProxyStorage.at(proxy.address)
-      RANDOM_ADDRESS.should.be.equal(await proxyStorageNew.getConsensus())
     })
   })
 })
