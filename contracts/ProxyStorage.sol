@@ -142,4 +142,16 @@ contract ProxyStorage is EternalStorage {
   function getVotingToChangeProxy() public view returns(address){
     return addressStorage[keccak256(abi.encodePacked("votingToChangeProxy"))];
   }
+
+  function isValidContractType(uint256 _contractType) public pure returns(bool) {
+    return
+      _contractType == uint256(ContractTypes.Consensus) ||
+      _contractType == uint256(ContractTypes.BlockReward) ||
+      _contractType == uint256(ContractTypes.BallotsStorage) ||
+      _contractType == uint256(ContractTypes.ProxyStorage) ||
+      _contractType == uint256(ContractTypes.VotingToChangeBlockReward) ||
+      _contractType == uint256(ContractTypes.VotingToChangeMinStake) ||
+      _contractType == uint256(ContractTypes.VotingToChangeMinThreshold) ||
+      _contractType == uint256(ContractTypes.VotingToChangeProxy);
+  }
 }

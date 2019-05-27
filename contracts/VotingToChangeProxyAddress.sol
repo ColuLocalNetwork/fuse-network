@@ -11,6 +11,7 @@ contract VotingToChangeProxyAddress is Voting {
 
   function newBallot(uint256 _startTime, uint256 _endTime, uint256 _contractType, address _proposedValue, string _description) public {
     require(_proposedValue != address(0));
+    require(validContractType(_contractType));
     uint256 ballotId = super.createBallot(uint256(BallotTypes.ProxyAddress), _startTime, _endTime, _description);
     setProposedValue(ballotId, _proposedValue);
     setContractType(ballotId, _contractType);
@@ -32,6 +33,10 @@ contract VotingToChangeProxyAddress is Voting {
 
   function finalizeBallotInner(uint256 _id) internal returns(bool) {
     return ProxyStorage(getProxyStorage()).setContractAddress(getContractType(_id), getProposedValue(_id));
+  }
+
+  function validContractType(uint256 _contractType) internal view returns(bool) {
+    return ProxyStorage(getProxyStorage()).isValidContractType(_contractType);
   }
 
   function getProposedValue(uint256 _id) internal view returns(address) {

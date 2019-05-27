@@ -1,12 +1,12 @@
 const Consensus = artifacts.require('ConsensusMock.sol')
 const ProxyStorage = artifacts.require('ProxyStorageMock.sol')
 const EternalStorageProxy = artifacts.require('EternalStorageProxyMock.sol')
-const BallotsStorage = artifacts.require('./BallotsStorage.sol')
-const BlockReward = artifacts.require('./BlockReward.sol')
-const VotingToChangeBlockReward = artifacts.require('./VotingToChangeBlockReward.sol')
-const VotingToChangeMinStake = artifacts.require('./VotingToChangeMinStake.sol')
-const VotingToChangeMinThreshold = artifacts.require('./VotingToChangeMinThreshold.sol')
-const VotingToChangeProxyAddress = artifacts.require('./VotingToChangeProxyAddress.sol')
+const BallotsStorage = artifacts.require('BallotsStorage.sol')
+const BlockReward = artifacts.require('BlockReward.sol')
+const VotingToChangeBlockReward = artifacts.require('VotingToChangeBlockReward.sol')
+const VotingToChangeMinStake = artifacts.require('VotingToChangeMinStake.sol')
+const VotingToChangeMinThreshold = artifacts.require('VotingToChangeMinThreshold.sol')
+const VotingToChangeProxyAddress = artifacts.require('VotingToChangeProxyAddress.sol')
 const {ERROR_MSG, ZERO_AMOUNT, ZERO_ADDRESS, RANDOM_ADDRESS} = require('./helpers')
 const {toBN, toWei, toChecksumAddress} = web3.utils
 
