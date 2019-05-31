@@ -26,7 +26,7 @@ contract('BallotsStorage', async (accounts) => {
     consensusImpl = await Consensus.new()
     proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
     consensus = await Consensus.at(proxy.address)
-    await consensus.initialize(toWei(toBN(10000), 'ether'), owner)
+    await consensus.initialize(toWei(toBN(10000), 'ether'), 24*60*60, 10, owner)
 
     // ProxyStorage
     proxyStorageImpl = await ProxyStorage.new()

@@ -1,3 +1,4 @@
+const moment = require('moment')
 const Consensus = artifacts.require('ConsensusMock.sol')
 const ProxyStorage = artifacts.require('ProxyStorage.sol')
 const EternalStorageProxy = artifacts.require('EternalStorageProxyMock.sol')
@@ -11,8 +12,10 @@ const ONE_ETHER = toWei(toBN(1), 'ether')
 const LESS_THAN_MIN_STAKE = toWei(toBN(MIN_STAKE_AMOUNT - 1), 'ether')
 const MORE_THAN_MIN_STAKE = toWei(toBN(MIN_STAKE_AMOUNT + 1), 'ether')
 const MULTIPLE_MIN_STAKE = toWei(toBN(MIN_STAKE_AMOUNT * MULTIPLY_AMOUNT), 'ether')
+const CYCLE_DURATION_SECONDS = 24*60*60
+const SNAPSHOTS_PER_CYCLE = 10
 
-contract('Consensus', async (accounts) => {
+contract.only('Consensus', async (accounts) => {
   let consensusImpl, proxy, consensus
   let owner = accounts[0]
   let nonOwner = accounts[1]
@@ -35,12 +38,18 @@ contract('Consensus', async (accounts) => {
 
   describe('initialize', async () => {
     it('default values', async () => {
-      await consensus.initialize(MIN_STAKE, initialValidator)
+      await consensus.initialize(MIN_STAKE, CYCLE_DURATION_SECONDS, SNAPSHOTS_PER_CYCLE, initialValidator)
       await consensus.setProxyStorage(proxyStorage.address)
       owner.should.equal(await proxy.getOwner())
       toChecksumAddress(SYSTEM_ADDRESS).should.be.equal(toChecksumAddress(await consensus.systemAddress()))
       false.should.be.equal(await consensus.isFinalized())
       MIN_STAKE.should.be.bignumber.equal(await consensus.getMinStake())
+      toBN(CYCLE_DURATION_SECONDS).should.be.bignumber.equal(await consensus.getCycleDuration())
+      toBN(SNAPSHOTS_PER_CYCLE).should.be.bignumber.equal(await consensus.getSnapshotsPerCycle())
+      toBN(CYCLE_DURATION_SECONDS / SNAPSHOTS_PER_CYCLE).should.be.bignumber.equal(await consensus.getTimeToSnapshot())
+      false.should.be.equal(await consensus.isCycleEnded())
+      toBN(0).should.be.bignumber.equal(await consensus.getLastSnapshotTakenTime())
+      toBN(0).should.be.bignumber.equal(await consensus.getNextSnapshotId())
       let validators = await consensus.getValidators()
       validators.length.should.be.equal(1)
       validators[0].should.be.equal(initialValidator)
@@ -48,33 +57,23 @@ contract('Consensus', async (accounts) => {
       pendingValidators.length.should.be.equal(0)
     })
     it('initial validator address not defined - owner should be initial validator', async () => {
-      await consensus.initialize(MIN_STAKE, ZERO_ADDRESS)
+      await consensus.initialize(MIN_STAKE, CYCLE_DURATION_SECONDS, SNAPSHOTS_PER_CYCLE, ZERO_ADDRESS)
       await consensus.setProxyStorage(proxyStorage.address)
-      toChecksumAddress(SYSTEM_ADDRESS).should.be.equal(toChecksumAddress(await consensus.systemAddress()))
-      false.should.be.equal(await consensus.isFinalized())
-      MIN_STAKE.should.be.bignumber.equal(await consensus.getMinStake())
       let validators = await consensus.getValidators()
       validators.length.should.be.equal(1)
       validators[0].should.be.equal(owner)
-      let pendingValidators = await consensus.getPendingValidators()
-      pendingValidators.length.should.be.equal(0)
     })
     it('initial validator address defined', async () => {
-      await consensus.initialize(MIN_STAKE, initialValidator)
-      toChecksumAddress(SYSTEM_ADDRESS).should.be.equal(toChecksumAddress(await consensus.systemAddress()))
-      false.should.be.equal(await consensus.isFinalized())
-      MIN_STAKE.should.be.bignumber.equal(await consensus.getMinStake())
+      await consensus.initialize(MIN_STAKE, CYCLE_DURATION_SECONDS, SNAPSHOTS_PER_CYCLE, initialValidator)
       let validators = await consensus.getValidators()
       validators.length.should.be.equal(1)
       validators[0].should.be.equal(initialValidator)
-      let pendingValidators = await consensus.getPendingValidators()
-      pendingValidators.length.should.be.equal(0)
     })
   })
 
   describe('setMinStake', async () => {
     beforeEach(async () => {
-      await consensus.initialize(MIN_STAKE, initialValidator)
+      await consensus.initialize(MIN_STAKE, CYCLE_DURATION_SECONDS, SNAPSHOTS_PER_CYCLE, initialValidator)
       await consensus.setProxyStorage(proxyStorage.address)
     })
     it('setMinStake should fail if not called by owner', async () => {
@@ -89,7 +88,7 @@ contract('Consensus', async (accounts) => {
 
   describe('setProxyStorage', async () => {
     beforeEach(async () => {
-      await consensus.initialize(MIN_STAKE, initialValidator)
+      await consensus.initialize(MIN_STAKE, CYCLE_DURATION_SECONDS, SNAPSHOTS_PER_CYCLE, initialValidator)
     })
     it('setProxyStorage should fail if no address', async () => {
       await consensus.setProxyStorage(ZERO_ADDRESS).should.be.rejectedWith(ERROR_MSG)
@@ -114,7 +113,7 @@ contract('Consensus', async (accounts) => {
 
   describe('finalizeChange', async () => {
     beforeEach(async () => {
-      await consensus.initialize(MIN_STAKE, initialValidator)
+      await consensus.initialize(MIN_STAKE, CYCLE_DURATION_SECONDS, SNAPSHOTS_PER_CYCLE, initialValidator)
       await consensus.setProxyStorage(proxyStorage.address)
     })
     it('should only be called by SYSTEM_ADDRESS', async () => {
@@ -132,7 +131,7 @@ contract('Consensus', async (accounts) => {
 
   describe('stake using payable', async () => {
     beforeEach(async () => {
-      await consensus.initialize(MIN_STAKE, initialValidator)
+      await consensus.initialize(MIN_STAKE, CYCLE_DURATION_SECONDS, SNAPSHOTS_PER_CYCLE, initialValidator)
       await consensus.setProxyStorage(proxyStorage.address)
     })
     describe('basic', async () => {
@@ -176,7 +175,7 @@ contract('Consensus', async (accounts) => {
       })
     })
 
-    describe('advanced', async () => {
+    describe.only('advanced', async () => {
       it('more than minimum stake amount, in more than one transaction', async () => {
         // 1st stake
         let {logs} = await consensus.sendTransaction({from: firstCandidate, value: LESS_THAN_MIN_STAKE})
@@ -370,7 +369,7 @@ contract('Consensus', async (accounts) => {
 
   describe('withdraw', async () => {
     beforeEach(async () => {
-      await consensus.initialize(MIN_STAKE, initialValidator)
+      await consensus.initialize(MIN_STAKE, CYCLE_DURATION_SECONDS, SNAPSHOTS_PER_CYCLE, initialValidator)
       await consensus.setProxyStorage(proxyStorage.address)
     })
     it('cannot withdraw zero', async () => {
@@ -380,11 +379,11 @@ contract('Consensus', async (accounts) => {
       await consensus.sendTransaction({from: firstCandidate, value: MIN_STAKE})
       await consensus.withdraw(MORE_THAN_MIN_STAKE).should.be.rejectedWith(ERROR_MSG)
     })
-    it('cannot withdraw and leave validators list empty', async () => {
+    it.only('cannot withdraw and leave validators list empty', async () => {
       await consensus.sendTransaction({from: firstCandidate, value: MIN_STAKE})
       await consensus.withdraw(MIN_STAKE, {from: firstCandidate}).should.be.rejectedWith(ERROR_MSG)
     })
-    it('can withdraw all staked amount and update validators', async () => {
+    it.only('can withdraw all staked amount and update validators', async () => {
       // stake
       await consensus.sendTransaction({from: firstCandidate, value: MIN_STAKE})
       // stake
@@ -409,7 +408,7 @@ contract('Consensus', async (accounts) => {
       logs[0].event.should.be.equal('ChangeFinalized')
       logs[0].args['newSet'].should.deep.equal(currentValidators)
     })
-    it('can withdraw less than staked amount and update validators', async () => {
+    it.only('can withdraw less than staked amount and update validators', async () => {
       // stake
       await consensus.sendTransaction({from: firstCandidate, value: MULTIPLE_MIN_STAKE})
       // withdraw
@@ -437,7 +436,7 @@ contract('Consensus', async (accounts) => {
       logs[0].event.should.be.equal('ChangeFinalized')
       logs[0].args['newSet'].should.deep.equal(currentValidators)
     })
-    it('can withdraw multiple times and update validators accordingly', async () => {
+    it.only('can withdraw multiple times and update validators accordingly', async () => {
       // stake
       await consensus.sendTransaction({from: firstCandidate, value: MULTIPLE_MIN_STAKE})
       // withdraw 1st time
@@ -525,7 +524,7 @@ contract('Consensus', async (accounts) => {
       await proxy.setProxyStorageMock(proxyStorage.address)
       consensusNew = await Consensus.at(proxy.address)
       false.should.be.equal(await consensusNew.isInitialized())
-      await consensusNew.initialize(MIN_STAKE, initialValidator).should.be.fulfilled
+      await consensusNew.initialize(MIN_STAKE, CYCLE_DURATION_SECONDS, SNAPSHOTS_PER_CYCLE, initialValidator).should.be.fulfilled
       true.should.be.equal(await consensusNew.isInitialized())
     })
     it('should use same proxyStorage after upgrade', async () => {

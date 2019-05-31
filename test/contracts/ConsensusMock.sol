@@ -10,4 +10,17 @@ contract ConsensusMock is Consensus {
   function addValidatorMock(address _validator) public onlyOwner {
     pendingValidatorsAdd(_validator);
   }
+
+  function setTime(uint256 _newTime) public {
+    uintStorage[keccak256(abi.encodePacked("mockTime"))] = _newTime;
+  }
+
+  function getTime() public view returns(uint256) {
+    uint256 time = uintStorage[keccak256(abi.encodePacked("mockTime"))];
+    if (time == 0) {
+      return now;
+    } else {
+      return time;
+    }
+  }
 }
