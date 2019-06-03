@@ -94,14 +94,7 @@ contract('VotingToChangeBlockReward', async (accounts) => {
       votingToChangeProxy
     )
 
-    await consensus.addValidatorMock(votingKeys[0])
-    await consensus.addValidatorMock(votingKeys[1])
-    await consensus.addValidatorMock(votingKeys[2])
-    await consensus.addValidatorMock(votingKeys[3])
-    await consensus.addValidatorMock(votingKeys[4])
-    await consensus.addValidatorMock(votingKeys[5])
-    await consensus.addValidatorMock(votingKeys[6])
-    await consensus.addValidatorMock(votingKeys[7])
+    await consensus.setNewValidatorSetMock(votingKeys)
     await consensus.setSystemAddressMock(owner, {from: owner})
     await consensus.finalizeChange().should.be.fulfilled
 

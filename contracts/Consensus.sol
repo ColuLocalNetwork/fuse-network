@@ -32,6 +32,9 @@ contract Consensus is ConsensusStorage, ValidatorSet {
     _;
   }
 
+  /**
+  * @dev This modifier verifies that msg.sender is the block reward contract
+  */
   modifier onlyBlockReward() {
     require (msg.sender == ProxyStorage(getProxyStorage()).getBlockReward());
     _;
@@ -168,6 +171,9 @@ contract Consensus is ConsensusStorage, ValidatorSet {
     }
   }
 
+  /**
+  * @dev Function to be called by the block reward contract each block to handle cycles and snapshots logic
+  */
   function cycle() public onlyBlockReward {
     if (isCycleEnded()) {
       uint randomSnapshotId = getRandom(0, getSnapshotsPerCycle() - 1);

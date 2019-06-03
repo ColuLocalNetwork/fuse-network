@@ -14,6 +14,11 @@ contract('BlockReward', async (accounts) => {
   let owner = accounts[0]
   let nonOwner = accounts[1]
   let mockSystemAddress = accounts[2]
+  let ballotsStorage = accounts[3]
+  let votingToChangeBlockReward = accounts[4]
+  let votingToChangeMinStake = accounts[5]
+  let votingToChangeMinThreshold = accounts[6]
+  let votingToChangeProxy = accounts[7]
 
   beforeEach(async () => {
     // Consensus
@@ -33,6 +38,16 @@ contract('BlockReward', async (accounts) => {
     blockRewardImpl = await BlockReward.new()
     proxy = await EternalStorageProxy.new(proxyStorage.address, blockRewardImpl.address)
     blockReward = await BlockReward.at(proxy.address)
+
+    // Initialize ProxyStorage
+    await proxyStorage.initializeAddresses(
+      blockReward.address,
+      ballotsStorage,
+      votingToChangeBlockReward,
+      votingToChangeMinStake,
+      votingToChangeMinThreshold,
+      votingToChangeProxy
+    )
   })
 
   describe('initialize', async () => {
