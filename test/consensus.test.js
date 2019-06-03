@@ -2,7 +2,7 @@ const moment = require('moment')
 const Consensus = artifacts.require('ConsensusMock.sol')
 const ProxyStorage = artifacts.require('ProxyStorageMock.sol')
 const EternalStorageProxy = artifacts.require('EternalStorageProxyMock.sol')
-const {ERROR_MSG, ZERO_AMOUNT, SYSTEM_ADDRESS, ZERO_ADDRESS, RANDOM_ADDRESS, advanceBlock} = require('./helpers')
+const {ERROR_MSG, ZERO_AMOUNT, SYSTEM_ADDRESS, ZERO_ADDRESS, RANDOM_ADDRESS, advanceTime, advanceBlock} = require('./helpers')
 const {toBN, toWei, toChecksumAddress} = web3.utils
 
 const MIN_STAKE_AMOUNT = 10000
@@ -355,7 +355,7 @@ contract('Consensus', async (accounts) => {
     it('hasCycleEnded', async () => {
       false.should.be.equal(await consensus.hasCycleEnded())
       let currentCycleEndTime = await consensus.getCurrentCycleEndTime()
-      await consensus.setTime(currentCycleEndTime + 1)
+      await advanceTime(CYCLE_DURATION_SECONDS)
       true.should.be.equal(await consensus.hasCycleEnded())
     })
     it('setCurrentCycleTimeframe', async () => {
