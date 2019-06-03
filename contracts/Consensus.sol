@@ -175,7 +175,7 @@ contract Consensus is ConsensusStorage, ValidatorSet {
   * @dev Function to be called by the block reward contract each block to handle cycles and snapshots logic
   */
   function cycle() public onlyBlockReward {
-    if (isCycleEnded()) {
+    if (hasCycleEnded()) {
       uint randomSnapshotId = getRandom(0, getSnapshotsPerCycle() - 1);
       setNewValidatorSet(getSnapshot(randomSnapshotId));
       setFinalized(false);

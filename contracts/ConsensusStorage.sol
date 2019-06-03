@@ -90,7 +90,7 @@ contract ConsensusStorage is EternalStorage {
       return uintStorage[keccak256(abi.encodePacked("currentCycleEndTime"))];
     }
 
-    function isCycleEnded() public view returns(bool) {
+    function hasCycleEnded() public view returns(bool) {
       return (getTime() >= getCurrentCycleEndTime());
     }
 
@@ -136,7 +136,7 @@ contract ConsensusStorage is EternalStorage {
     }
 
     function getRandom(uint256 _from, uint256 _to) public view returns(uint256) {
-      return uint256(keccak256(abi.encodePacked(blockhash(block.number)))).mod(_to).add(_from);
+      return uint256(keccak256(abi.encodePacked(blockhash(block.number - 1)))).mod(_to).add(_from);
     }
 
     function currentValidators() public view returns(address[]) {

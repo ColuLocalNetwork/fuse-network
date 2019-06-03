@@ -1,8 +1,8 @@
 const moment = require('moment')
 const Consensus = artifacts.require('ConsensusMock.sol')
-const ProxyStorage = artifacts.require('ProxyStorage.sol')
+const ProxyStorage = artifacts.require('ProxyStorageMock.sol')
 const EternalStorageProxy = artifacts.require('EternalStorageProxyMock.sol')
-const {ERROR_MSG, ZERO_AMOUNT, SYSTEM_ADDRESS, ZERO_ADDRESS, RANDOM_ADDRESS} = require('./helpers')
+const {ERROR_MSG, ZERO_AMOUNT, SYSTEM_ADDRESS, ZERO_ADDRESS, RANDOM_ADDRESS, advanceBlock} = require('./helpers')
 const {toBN, toWei, toChecksumAddress} = web3.utils
 
 const MIN_STAKE_AMOUNT = 10000
@@ -47,7 +47,7 @@ contract('Consensus', async (accounts) => {
       toBN(CYCLE_DURATION_SECONDS).should.be.bignumber.equal(await consensus.getCycleDuration())
       toBN(SNAPSHOTS_PER_CYCLE).should.be.bignumber.equal(await consensus.getSnapshotsPerCycle())
       toBN(CYCLE_DURATION_SECONDS / SNAPSHOTS_PER_CYCLE).should.be.bignumber.equal(await consensus.getTimeToSnapshot())
-      false.should.be.equal(await consensus.isCycleEnded())
+      false.should.be.equal(await consensus.hasCycleEnded())
       toBN(0).should.be.bignumber.equal(await consensus.getLastSnapshotTakenTime())
       toBN(0).should.be.bignumber.equal(await consensus.getNextSnapshotId())
       let validators = await consensus.getValidators()
@@ -347,8 +347,62 @@ contract('Consensus', async (accounts) => {
     })
   })
 
-  describe('cycle', async () => {
-    // TODO
+  describe('cycles and snapshots', async () => {
+    beforeEach(async () => {
+      await consensus.initialize(MIN_STAKE, CYCLE_DURATION_SECONDS, SNAPSHOTS_PER_CYCLE, initialValidator)
+      await consensus.setProxyStorage(proxyStorage.address)
+    })
+    it('hasCycleEnded', async () => {
+      false.should.be.equal(await consensus.hasCycleEnded())
+      let currentCycleEndTime = await consensus.getCurrentCycleEndTime()
+      await consensus.setTime(currentCycleEndTime + 1)
+      true.should.be.equal(await consensus.hasCycleEnded())
+    })
+    it('setCurrentCycleTimeframe', async () => {
+      let mockTime = moment.utc().unix()
+      await consensus.setTime(mockTime)
+      await proxyStorage.setBlockRewardMock(owner)
+      await consensus.cycle({from: owner})
+      toBN(mockTime).should.be.bignumber.equal(await consensus.getCurrentCycleStartTime())
+      toBN(mockTime + CYCLE_DURATION_SECONDS).should.be.bignumber.equal(await consensus.getCurrentCycleEndTime())
+    })
+    it('shouldTakeSnapshot', async () => {
+      let timeToSnapshot = await consensus.getTimeToSnapshot()
+      let lastSnapshotTakenTime = await consensus.getLastSnapshotTakenTime()
+      let currentTime = await consensus.getTime()
+      let shouldTakeSnapshot = currentTime.sub(lastSnapshotTakenTime).gte(timeToSnapshot)
+      shouldTakeSnapshot.should.be.equal(await consensus.shouldTakeSnapshot())
+
+      await consensus.setSnapshotsPerCycle(CYCLE_DURATION_SECONDS, {from: owner})
+      true.should.be.equal(await consensus.shouldTakeSnapshot())
+    })
+    it('getSnapshot & addToSnapshot', async () => {
+      let id = await consensus.getNextSnapshotId()
+      let snapshot = await consensus.getSnapshot(id)
+      snapshot.length.should.be.equal(0)
+      snapshot.should.deep.equal([])
+      await consensus.addToSnapshotMock(accounts[1], id)
+      await consensus.addToSnapshotMock(accounts[2], id)
+      await consensus.addToSnapshotMock(accounts[3], id)
+      snapshot = await consensus.getSnapshot(id)
+      snapshot.length.should.be.equal(3)
+      snapshot.should.deep.equal([accounts[1], accounts[2], accounts[3]])
+    })
+    it('getRandom', async () => {
+      let repeats = 25
+      let randoms = []
+      for (let i = 0; i < repeats; i++) {
+        randoms.push((await consensus.getRandom(0, SNAPSHOTS_PER_CYCLE)).toNumber())
+        await advanceBlock()
+      }
+      randoms.length.should.be.equal(repeats)
+      let distincts = [...new Set(randoms)]
+      distincts.length.should.be.greaterThan(1)
+      distincts.length.should.be.lessThan(SNAPSHOTS_PER_CYCLE)
+    })
+    it('validator set should be updated successfully when needed', async () => {
+      // TODO
+    })
   })
 
   describe('withdraw', async () => {

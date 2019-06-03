@@ -23,4 +23,8 @@ contract ConsensusMock is Consensus {
   function setNewValidatorSetMock(address[] _newSet) public {
     addressArrayStorage[keccak256(abi.encodePacked("newValidatorSet"))] = _newSet;
   }
+
+  function addToSnapshotMock(address _address, uint256 _snapshotId) public {
+    addToSnapshot(_address, _snapshotId);
+  }
 }
