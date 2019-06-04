@@ -22,6 +22,7 @@ contract('Consensus', async (accounts) => {
   let initialValidator = accounts[0]
   let firstCandidate = accounts[1]
   let secondCandidate = accounts[2]
+  let thirdCandidate = accounts[3]
 
   beforeEach(async () => {
     // Consensus
@@ -358,14 +359,6 @@ contract('Consensus', async (accounts) => {
       await advanceTime(CYCLE_DURATION_SECONDS)
       true.should.be.equal(await consensus.hasCycleEnded())
     })
-    it('setCurrentCycleTimeframe', async () => {
-      let mockTime = moment.utc().unix()
-      await consensus.setTime(mockTime)
-      await proxyStorage.setBlockRewardMock(owner)
-      await consensus.cycle({from: owner})
-      toBN(mockTime).should.be.bignumber.equal(await consensus.getCurrentCycleStartTime())
-      toBN(mockTime + CYCLE_DURATION_SECONDS).should.be.bignumber.equal(await consensus.getCurrentCycleEndTime())
-    })
     it('shouldTakeSnapshot', async () => {
       let timeToSnapshot = await consensus.getTimeToSnapshot()
       let lastSnapshotTakenTime = await consensus.getLastSnapshotTakenTime()
@@ -400,8 +393,142 @@ contract('Consensus', async (accounts) => {
       distincts.length.should.be.greaterThan(1)
       distincts.length.should.be.lessThan(SNAPSHOTS_PER_CYCLE)
     })
-    it('validator set should be updated successfully when needed', async () => {
-      // TODO
+    it('golden flow should work', async () => {
+      let currentValidators, pendingValidators, timeToSnapshot, id, snapshot, randomSnapshotId, randomSnapshot, tx
+
+      await consensus.setSystemAddressMock(owner)
+      await proxyStorage.setBlockRewardMock(owner)
+
+      await consensus.setSnapshotsPerCycle(3, {from: owner})
+
+      currentValidators = await consensus.getValidators()
+      currentValidators.length.should.be.equal(1)
+      currentValidators[0].should.be.equal(initialValidator)
+      // console.log('currentValidators', currentValidators)
+      pendingValidators = await consensus.getPendingValidators()
+      pendingValidators.length.should.be.equal(0)
+      // console.log('pendingValidators', pendingValidators)
+
+      // 1st staker added to pending validators
+      await consensus.sendTransaction({from: firstCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
+      pendingValidators = await consensus.getPendingValidators()
+      pendingValidators.length.should.be.equal(1)
+      pendingValidators.should.deep.equal([firstCandidate])
+      // console.log('pendingValidators', pendingValidators)
+
+      // advance time to take snapshot
+      timeToSnapshot = (await consensus.getTimeToSnapshot()).toNumber()
+      await advanceTime(timeToSnapshot)
+      await advanceBlock()
+
+      // call cycle function
+      tx = await consensus.cycle({from: owner}).should.be.fulfilled
+      tx.logs.length.should.be.equal(0)
+
+      // check snapshot created
+      id = await consensus.getNextSnapshotId()
+      snapshot = await consensus.getSnapshot(id - 1)
+      snapshot.length.should.be.equal(1)
+      snapshot.should.deep.equal([firstCandidate])
+
+      // 2nd staker added to pending validators
+      await consensus.sendTransaction({from: secondCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
+      pendingValidators = await consensus.getPendingValidators()
+      pendingValidators.length.should.be.equal(2)
+      pendingValidators.should.deep.equal([firstCandidate, secondCandidate])
+      // console.log('pendingValidators', pendingValidators)
+
+      // advance time to take snapshot
+      timeToSnapshot = (await consensus.getTimeToSnapshot()).toNumber()
+      await advanceTime(timeToSnapshot)
+      await advanceBlock()
+
+      // call cycle function
+      tx = await consensus.cycle({from: owner}).should.be.fulfilled
+      tx.logs.length.should.be.equal(0)
+
+      // check snapshot created
+      id = await consensus.getNextSnapshotId()
+      snapshot = await consensus.getSnapshot(id - 1)
+      snapshot.length.should.be.equal(2)
+      snapshot.should.deep.equal([firstCandidate, secondCandidate])
+
+      // advance time to end cycle
+      await advanceTime(CYCLE_DURATION_SECONDS - 2 * timeToSnapshot)
+      await advanceBlock()
+
+      // get random snapshot id
+      randomSnapshotId = (await consensus.getRandom(0, (await consensus.getSnapshotsPerCycle()).toNumber() - 1)).toNumber()
+      // console.log('randomSnapshotId', randomSnapshotId)
+      randomSnapshot = await consensus.getSnapshot(randomSnapshotId)
+      // console.log('randomSnapshot', randomSnapshot)
+
+      // call cycle function
+      tx = await consensus.cycle({from: owner}).should.be.fulfilled
+      tx.logs.length.should.be.equal(1)
+      tx.logs[0].event.should.be.equal('InitiateChange')
+      tx.logs[0].args['newSet'].should.deep.equal(randomSnapshot)
+
+      // call finalizeChange
+      tx = await consensus.finalizeChange().should.be.fulfilled
+      currentValidators = await consensus.getValidators()
+      currentValidators.length.should.be.equal(randomSnapshot.length)
+      currentValidators.should.deep.equal(randomSnapshot)
+      tx.logs[0].event.should.be.equal('ChangeFinalized')
+      tx.logs[0].args['newSet'].should.deep.equal(randomSnapshot)
+      // console.log('currentValidators', currentValidators)
+
+      // 3rd staker added to pending validators
+      await consensus.sendTransaction({from: thirdCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
+      pendingValidators = await consensus.getPendingValidators()
+      pendingValidators.length.should.be.equal(3)
+      pendingValidators.should.deep.equal([firstCandidate, secondCandidate, thirdCandidate])
+      // console.log('pendingValidators', pendingValidators)
+
+      // advance time to take snapshot
+      timeToSnapshot = (await consensus.getTimeToSnapshot()).toNumber()
+      await advanceTime(timeToSnapshot)
+      await advanceBlock()
+
+      // call cycle function
+      tx = await consensus.cycle({from: owner}).should.be.fulfilled
+      tx.logs.length.should.be.equal(0)
+
+      // check snapshot created
+      id = await consensus.getNextSnapshotId()
+      snapshot = await consensus.getSnapshot(id - 1)
+      snapshot.length.should.be.equal(3)
+      snapshot.should.deep.equal([firstCandidate, secondCandidate, thirdCandidate])
+
+      // advance time to end cycle
+      await advanceTime(CYCLE_DURATION_SECONDS - 1 * timeToSnapshot)
+      await advanceBlock()
+
+      // get random snapshot id
+      newRandomSnapshotId = (await consensus.getRandom(0, (await consensus.getSnapshotsPerCycle()).toNumber() - 1)).toNumber()
+      while (newRandomSnapshotId == randomSnapshotId) {
+        await advanceBlock()
+        newRandomSnapshotId = (await consensus.getRandom(0, (await consensus.getSnapshotsPerCycle()).toNumber() - 1)).toNumber()
+      }
+      randomSnapshotId = newRandomSnapshotId
+      // console.log('randomSnapshotId', randomSnapshotId)
+      randomSnapshot = await consensus.getSnapshot(randomSnapshotId)
+      // console.log('randomSnapshot', randomSnapshot)
+
+      // call cycle function
+      tx = await consensus.cycle({from: owner}).should.be.fulfilled
+      tx.logs.length.should.be.equal(1)
+      tx.logs[0].event.should.be.equal('InitiateChange')
+      tx.logs[0].args['newSet'].should.deep.equal(randomSnapshot)
+
+      // call finalizeChange
+      tx = await consensus.finalizeChange().should.be.fulfilled
+      currentValidators = await consensus.getValidators()
+      currentValidators.length.should.be.equal(randomSnapshot.length)
+      currentValidators.should.deep.equal(randomSnapshot)
+      tx.logs[0].event.should.be.equal('ChangeFinalized')
+      tx.logs[0].args['newSet'].should.deep.equal(randomSnapshot)
+      // console.log('currentValidators', currentValidators)
     })
   })
 
