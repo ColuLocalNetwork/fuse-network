@@ -72,11 +72,10 @@ contract Voting is EternalStorage, VotingBase {
   * @param _id ballot id to get info of
   * @param _key voter key to get if voted already
   */
-  function getBallotInfo(uint256 _id, address _key) public view returns(uint256 startBlock, uint256 endBlock, uint256 totalVoters, int256 progress, bool isFinalized, address proposedValue, uint256 contractType, address creator, string description, bool canBeFinalizedNow, bool alreadyVoted) {
+  function getBallotInfo(uint256 _id, address _key) public view returns(uint256 startBlock, uint256 endBlock, uint256 totalVoters, bool isFinalized, address proposedValue, uint256 contractType, address creator, string description, bool canBeFinalizedNow, bool alreadyVoted) {
     startBlock = getStartBlock(_id);
     endBlock = getEndBlock(_id);
     totalVoters = getTotalVoters(_id);
-    progress = getProgress(_id);
     isFinalized = getIsFinalized(_id);
     proposedValue = getProposedValue(_id);
     contractType = getContractType(_id);
@@ -167,7 +166,6 @@ contract Voting is EternalStorage, VotingBase {
     setCreator(ballotId, creator);
     setDescription(ballotId, _description);
     setTotalVoters(ballotId, 0);
-    setProgress(ballotId, 0);
     setIndex(ballotId, activeBallotsLength());
     activeBallotsAdd(ballotId);
     increaseValidatorLimit(creator);
@@ -184,7 +182,7 @@ contract Voting is EternalStorage, VotingBase {
     if (_key == address(0)) {
       return false;
     }
-    return boolStorage[keccak256(abi.encodePacked("votingState", _id, "voters", _key))];
+    return getVoterChoice(_id, _key) != 0;
   }
 
   /**
@@ -199,23 +197,31 @@ contract Voting is EternalStorage, VotingBase {
   }
 
   /**
+  * @dev Function checking if a voting decision is a valid one
+  * @param _choice voting decision
+  */
+  function isValidChoice(uint256 _choice) public pure returns(bool) {
+    return _choice == uint(ActionChoices.Accept) || _choice == uint(ActionChoices.Reject);
+  }
+
+  /**
   * @dev This function is used to vote on a ballot
   * @param _id ballot id to vote on
   * @param _choice voting decision on the ballot (see VotingBase.ActionChoices)
   */
-  function vote(uint256 _id, uint256 _choice) external onlyValidVotingKey(msg.sender) {
+  function vote(uint256 _id, uint256 _choice) external {
     require(!getIsFinalized(_id));
     address voter = msg.sender;
     require(isValidVote(_id, voter));
-    if (_choice == uint(ActionChoices.Accept)) {
-      setProgress(_id, getProgress(_id) + 1);
-    } else if (_choice == uint(ActionChoices.Reject)) {
-      setProgress(_id, getProgress(_id) - 1);
-    } else {
-      revert();
-    }
-    votersAdd(_id, voter);
+    require(isValidChoice(_choice));
+    setVoterChoice(_id, voter, _choice);
     setTotalVoters(_id, getTotalVoters(_id).add(1));
+    // TODO this should be removed, count only on cycle end and only current validator votes
+    if (_choice == uint(ActionChoices.Accept)) {
+      setResult(_id, getResult(_id) + 1);
+    } else {
+      setResult(_id, getResult(_id) - 1);
+    }
     emit Vote(_id, _choice, voter);
   }
 
@@ -242,7 +248,7 @@ contract Voting is EternalStorage, VotingBase {
       setFinalizeCalled(_id);
     }
 
-    if (getProgress(_id) > 0) {
+    if (getResult(_id) > 0) {
       if (finalizeBallot(_id)) {
         setQuorumState(_id, uint256(QuorumStates.Accepted));
       } else {
@@ -367,12 +373,12 @@ contract Voting is EternalStorage, VotingBase {
     uintStorage[keccak256(abi.encodePacked("votingState", _id, "totalVoters"))] = _value;
   }
 
-  function getProgress(uint256 _id) public view returns(int256) {
-    return intStorage[keccak256(abi.encodePacked("votingState", _id, "progress"))];
+  function getResult(uint256 _id) public view returns(int256) {
+    return intStorage[keccak256(abi.encodePacked("votingState", _id, "result"))];
   }
 
-  function setProgress(uint256 _id, int256 _value) private {
-    intStorage[keccak256(abi.encodePacked("votingState", _id, "progress"))] = _value;
+  function setResult(uint256 _id, int256 _value) private {
+    intStorage[keccak256(abi.encodePacked("votingState", _id, "result"))] = _value;
   }
 
   function getIndex(uint256 _id) public view returns(uint256) {
@@ -445,8 +451,12 @@ contract Voting is EternalStorage, VotingBase {
     return Consensus(ProxyStorage(getProxyStorage()).getConsensus()).currentValidatorsLength();
   }
 
-  function votersAdd(uint256 _id, address _key) private {
-    boolStorage[keccak256(abi.encodePacked("votingState", _id, "voters", _key))] = true;
+  function setVoterChoice(uint256 _id, address _key, uint256 _choice) private {
+    uintStorage[keccak256(abi.encodePacked("votingState", _id, "voters", _key))] = _choice;
+  }
+
+  function getVoterChoice(uint256 _id, address _key) public view returns(uint256) {
+    return uintStorage[keccak256(abi.encodePacked("votingState", _id, "voters", _key))];
   }
 
   function withinLimit(address _key) private view returns(bool) {
