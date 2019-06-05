@@ -21,14 +21,13 @@ contract Voting is EternalStorage, VotingBase {
   }
 
   /**
-  * @dev This modifier verifies times are valid
+  * @dev This modifier verifies the duration of the ballot is valid
   */
-  modifier onlyValidTime(uint256 _startTime, uint256 _endTime) {
-    require(_startTime > 0 && _endTime > 0);
-    require(_endTime > _startTime && _startTime > getTime());
-    uint256 diffTime = _endTime.sub(_startTime);
-    require(diffTime > getMinBallotDuration());
-    require(diffTime <= getMaxBallotDuration());
+  modifier onlyValidDuration(uint256 _startAfterNumberOfCycles, uint256 _cyclesDuration) {
+    require(_startAfterNumberOfCycles > 0);
+    require (_cyclesDuration > 0);
+    require(_cyclesDuration >= getMinBallotDurationCycles());
+    require(_cyclesDuration <= getMaxBallotDurationCycles());
     _;
   }
 
@@ -42,27 +41,27 @@ contract Voting is EternalStorage, VotingBase {
 
   /**
   * @dev Function to be called on contract initialization
-  * @param _minBallotDuration minimum time (in seconds) a ballot can be open before finalization
+  * @param _minBallotDurationCycles minimum number of cycles a ballot can be open before finalization
   */
-  function initialize(uint256 _minBallotDuration) public onlyOwner {
+  function initialize(uint256 _minBallotDurationCycles) public onlyOwner {
     require(!isInitialized());
-    require(_minBallotDuration < getMaxBallotDuration());
-    setMinBallotDuration(_minBallotDuration);
+    require(_minBallotDurationCycles < getMaxBallotDurationCycles());
+    setMinBallotDurationCycles(_minBallotDurationCycles);
     setInitialized(true);
   }
 
   /**
   * @dev Function to create a new ballot
-  * @param _startTime unix timestamp representing ballot start time (open for voting)
-  * @param _endTime unix timestamp representing ballot end time (closed for voting and can be finalized)
+  * @param _startAfterNumberOfCycles number of cycles after which the ballot should open for voting
+  * @param _cyclesDuration number of cycles the ballot will remain open for voting
   * @param _contractType contract type to change its address (See ProxyStorage.ContractTypes)
   * @param _proposedValue proposed address for the contract type
   * @param _description ballot text description
   */
-  function newBallot(uint256 _startTime, uint256 _endTime, uint256 _contractType, address _proposedValue, string _description) public returns(uint256) {
+  function newBallot(uint256 _startAfterNumberOfCycles, uint256 _cyclesDuration, uint256 _contractType, address _proposedValue, string _description) public returns(uint256) {
     require(_proposedValue != address(0));
     require(validContractType(_contractType));
-    uint256 ballotId = createBallot(_startTime, _endTime, _description);
+    uint256 ballotId = createBallot(_startAfterNumberOfCycles, _cyclesDuration, _description);
     setProposedValue(ballotId, _proposedValue);
     setContractType(ballotId, _contractType);
     return ballotId;
@@ -73,9 +72,9 @@ contract Voting is EternalStorage, VotingBase {
   * @param _id ballot id to get info of
   * @param _key voter key to get if voted already
   */
-  function getBallotInfo(uint256 _id, address _key) public view returns(uint256 startTime, uint256 endTime, uint256 totalVoters, int256 progress, bool isFinalized, address proposedValue, uint256 contractType, address creator, string description, bool canBeFinalizedNow, bool alreadyVoted) {
-    startTime = getStartTime(_id);
-    endTime = getEndTime(_id);
+  function getBallotInfo(uint256 _id, address _key) public view returns(uint256 startBlock, uint256 endBlock, uint256 totalVoters, int256 progress, bool isFinalized, address proposedValue, uint256 contractType, address creator, string description, bool canBeFinalizedNow, bool alreadyVoted) {
+    startBlock = getStartBlock(_id);
+    endBlock = getEndBlock(_id);
     totalVoters = getTotalVoters(_id);
     progress = getProgress(_id);
     isFinalized = getIsFinalized(_id);
@@ -128,14 +127,21 @@ contract Voting is EternalStorage, VotingBase {
   }
 
   /**
+  * @dev Function to get the max number of "open" (active) ballots can be at the same time
+  */
+  function getMaxLimitOfBallots() public pure returns(uint256) {
+    return 100;
+  }
+
+  /**
   * @dev Function to get the number of "open" (active) ballots each validator (someone with voting rights) can have at the same time
   */
   function getBallotLimitPerValidator() public view returns(uint256) {
     uint256 validatorsCount = getTotalNumberOfValidators();
     if (validatorsCount == 0) {
-      return getMaxLimitBallot();
+      return getMaxLimitOfBallots();
     }
-    uint256 limit = getMaxLimitBallot().div(validatorsCount);
+    uint256 limit = getMaxLimitOfBallots().div(validatorsCount);
     if (limit == 0) {
       limit = 1;
     }
@@ -144,18 +150,18 @@ contract Voting is EternalStorage, VotingBase {
 
   /**
   * @dev This function is used to create a ballot
-  * @param _startTime unix timestamp representing ballot start time (open for voting)
-  * @param _endTime unix timestamp representing ballot end time (closed for voting and can be finalized)
+  * @param _startAfterNumberOfCycles number of cycles after which the ballot should open for voting
+  * @param _cyclesDuration number of cycles the ballot will remain open for voting
   * @param _description ballot text description
   */
-  function createBallot(uint256 _startTime, uint256 _endTime, string _description) private onlyValidVotingKey(msg.sender) onlyValidTime(_startTime, _endTime) returns(uint256) {
+  function createBallot(uint256 _startAfterNumberOfCycles, uint256 _cyclesDuration, string _description) private onlyValidVotingKey(msg.sender) onlyValidDuration(_startAfterNumberOfCycles, _cyclesDuration) returns(uint256) {
     require(isInitialized());
     address creator = msg.sender;
     require(withinLimit(creator));
     uint256 ballotId = getNextBallotId();
     setNextBallotId(ballotId.add(1));
-    setStartTime(ballotId, _startTime);
-    setEndTime(ballotId, _endTime);
+    setStartBlock(ballotId, _startAfterNumberOfCycles);
+    setEndBlock(ballotId, _cyclesDuration);
     setIsFinalized(ballotId, false);
     setQuorumState(ballotId, uint256(QuorumStates.InProgress));
     setCreator(ballotId, creator);
@@ -210,7 +216,19 @@ contract Voting is EternalStorage, VotingBase {
     }
     votersAdd(_id, voter);
     setTotalVoters(_id, getTotalVoters(_id).add(1));
-    emit Vote(_id, _choice, voter, getTime());
+    emit Vote(_id, _choice, voter);
+  }
+
+  /**
+  * @dev This function is used to check if a ballot can be finalized
+  * @param _id ballot id to check
+  */
+  function canBeFinalized(uint256 _id) public view returns(bool) {
+    if (_id >= getNextBallotId()) return false;
+    if (getStartBlock(_id) > getCurrentBlockNumber()) return false;
+    if (getIsFinalized(_id)) return false;
+
+    return getCurrentBlockNumber() > getEndBlock(_id);
   }
 
   /**
@@ -219,34 +237,24 @@ contract Voting is EternalStorage, VotingBase {
   */
   function finalize(uint256 _id) external onlyValidVotingKey(msg.sender) {
     require(canBeFinalized(_id));
-    finalizeBallot(_id);
-  }
-
-  /**
-  * @dev This function is used to check if a ballot can be finalized
-  * @param _id ballot id to check
-  * A ballot can be finalized if all possible voters have voted and minimum ballot duration has passed or if end time has passed
-  */
-  function canBeFinalized(uint256 _id) public view returns(bool) {
-    uint256 currentTime = getTime();
-    uint256 startTime = getStartTime(_id);
-
-    if (_id >= getNextBallotId()) return false;
-    if (startTime > currentTime) return false;
-    if (getIsFinalized(_id)) return false;
-
-    uint256 validatorsLength = getTotalNumberOfValidators();
-
-    if (validatorsLength == 0) {
-      return false;
+    if (!getFinalizeCalled(_id)) {
+      decreaseValidatorLimit(_id);
+      setFinalizeCalled(_id);
     }
 
-    if (getTotalVoters(_id) < validatorsLength) {
-      return !isActiveBallot(_id);
+    if (getProgress(_id) > 0) {
+      if (finalizeBallot(_id)) {
+        setQuorumState(_id, uint256(QuorumStates.Accepted));
+      } else {
+        return;
+      }
+    } else {
+      setQuorumState(_id, uint256(QuorumStates.Rejected));
     }
 
-    uint256 diffTime = currentTime.sub(startTime);
-    return diffTime > getMinBallotDuration();
+    deactivateBallot(_id);
+    setIsFinalized(_id, true);
+    emit BallotFinalized(_id, msg.sender);
   }
 
   function deactivateBallot(uint256 _id) private {
@@ -263,46 +271,17 @@ contract Voting is EternalStorage, VotingBase {
     activeBallotsDecreaseLength();
   }
 
-  function finalizeBallot(uint256 _id) private {
-    if (!getFinalizeCalled(_id)) {
-      decreaseValidatorLimit(_id);
-      setFinalizeCalled(_id);
-    }
-
-    if (getProgress(_id) > 0 && getTotalVoters(_id) >= getMinThresholdOfVoters(_id)) {
-      if (finalizeBallotInner(_id)) {
-        setQuorumState(_id, uint256(QuorumStates.Accepted));
-      } else {
-        return;
-      }
-    } else {
-      setQuorumState(_id, uint256(QuorumStates.Rejected));
-    }
-
-    deactivateBallot(_id);
-    setIsFinalized(_id, true);
-    emit BallotFinalized(_id, msg.sender);
-  }
-
-  function finalizeBallotInner(uint256 _id) private returns(bool) {
+  function finalizeBallot(uint256 _id) private returns(bool) {
     return ProxyStorage(getProxyStorage()).setContractAddress(getContractType(_id), getProposedValue(_id));
   }
 
   /// storage functions ///
-  function getTime() public view returns(uint256) {
-    return now;
+  function getCurrentBlockNumber() public view returns(uint256) {
+    return block.number;
   }
 
   function isActiveBallot(uint256 _id) public view returns(bool) {
-    return getStartTime(_id) <= getTime() && getTime() <= getEndTime(_id);
-  }
-
-  function getMinThresholdOfVoters(uint256 _id) public view returns(uint256) {
-    return uintStorage[keccak256(abi.encodePacked("votingState", _id, "minThresholdOfVoters"))];
-  }
-
-  function setMinThresholdOfVoters(uint256 _id, uint256 _value) private {
-    uintStorage[keccak256(abi.encodePacked("votingState", _id, "minThresholdOfVoters"))] = _value;
+    return getStartBlock(_id) <= getCurrentBlockNumber() && getCurrentBlockNumber() <= getEndBlock(_id);
   }
 
   function getQuorumState(uint256 _id) public view returns(uint256) {
@@ -321,32 +300,39 @@ contract Voting is EternalStorage, VotingBase {
     uintStorage[keccak256(abi.encodePacked("nextBallotId"))] = _id;
   }
 
-  function getMinBallotDuration() public view returns(uint256) {
-    return uintStorage[keccak256(abi.encodePacked("minBallotDuration"))];
+  function getMinBallotDurationCycles() public view returns(uint256) {
+    return uintStorage[keccak256(abi.encodePacked("minBallotDurationCycles"))];
   }
 
-  function setMinBallotDuration(uint256 _value) private {
-    uintStorage[keccak256(abi.encodePacked("minBallotDuration"))] = _value;
+  function setMinBallotDurationCycles(uint256 _value) private {
+    uintStorage[keccak256(abi.encodePacked("minBallotDurationCycles"))] = _value;
   }
 
-  function getMaxBallotDuration() public pure returns(uint256) {
-    return 14 days;
+  function getMaxBallotDurationCycles() public pure returns(uint256) {
+    return 14;
   }
 
-  function getStartTime(uint256 _id) public view returns(uint256) {
-    return uintStorage[keccak256(abi.encodePacked("votingState", _id, "startTime"))];
+  function getStartBlock(uint256 _id) public view returns(uint256) {
+    return uintStorage[keccak256(abi.encodePacked("votingState", _id, "startBlock"))];
   }
 
-  function setStartTime(uint256 _id, uint256 _value) private {
-    uintStorage[keccak256(abi.encodePacked("votingState", _id, "startTime"))] = _value;
+  function setStartBlock(uint256 _id, uint256 _startAfterNumberOfCycles) private {
+    Consensus consensus = Consensus(ProxyStorage(getProxyStorage()).getConsensus());
+    uint256 cycleDurationBlocks = consensus.getCycleDurationBlocks();
+    uint256 currentCycleEndBlock = consensus.getCurrentCycleEndBlock();
+    uint256 startBlock = currentCycleEndBlock.add(_startAfterNumberOfCycles.mul(cycleDurationBlocks));
+    uintStorage[keccak256(abi.encodePacked("votingState", _id, "startBlock"))] = startBlock;
   }
 
-  function getEndTime(uint256 _id) public view returns(uint256) {
-    return uintStorage[keccak256(abi.encodePacked("votingState", _id, "endTime"))];
+  function getEndBlock(uint256 _id) public view returns(uint256) {
+    return uintStorage[keccak256(abi.encodePacked("votingState", _id, "endBlock"))];
   }
 
-  function setEndTime(uint256 _id, uint256 _value) private {
-    uintStorage[keccak256(abi.encodePacked("votingState", _id, "endTime"))] = _value;
+  function setEndBlock(uint256 _id, uint256 _cyclesDuration) private {
+    uint256 cycleDurationBlocks = Consensus(ProxyStorage(getProxyStorage()).getConsensus()).getCycleDurationBlocks();
+    uint256 startBlock = getStartBlock(_id);
+    uint256 endBlock = startBlock.add(_cyclesDuration.mul(cycleDurationBlocks));
+    uintStorage[keccak256(abi.encodePacked("votingState", _id, "endBlock"))] = endBlock;
   }
 
   function getIsFinalized(uint256 _id) public view returns(bool) {
@@ -465,12 +451,5 @@ contract Voting is EternalStorage, VotingBase {
 
   function withinLimit(address _key) private view returns(bool) {
     return validatorActiveBallots(_key) < getBallotLimitPerValidator();
-  }
-
-  /**
-  * @dev Function to get the max number of "open" (active) ballots can be at the same time
-  */
-  function getMaxLimitBallot() public pure returns(uint256) {
-    return 100;
   }
 }

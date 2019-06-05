@@ -4,10 +4,13 @@ const BlockReward = artifacts.require('BlockReward.sol')
 const Consensus = artifacts.require('ConsensusMock.sol')
 const ProxyStorage = artifacts.require('ProxyStorageMock.sol')
 const Voting = artifacts.require('VotingMock.sol')
-const {ERROR_MSG, ZERO_ADDRESS, RANDOM_ADDRESS} = require('./helpers')
+const {ERROR_MSG, ZERO_ADDRESS, RANDOM_ADDRESS, advanceBlocks} = require('./helpers')
 const {toBN, toWei} = web3.utils
 
-const MIN_BALLOT_DURATION_SECONDS = 172800 // 2 days
+
+const CYCLE_DURATION_BLOCKS = 10
+const SNAPSHOTS_PER_CYCLE = 2
+const MIN_BALLOT_DURATION_CYCLES = 2 // 2 days
 
 const CONTRACT_TYPES = {
   INVALID: 0,
@@ -30,20 +33,20 @@ const ACTION_CHOICES = {
   REJECT: 2
 }
 
-let VOTING_START_TIME, VOTING_END_TIME
-
 contract('Voting', async (accounts) => {
   let consensus, proxy, proxyStorage
   let votingImpl, voting
   let owner = accounts[0]
   let votingKeys = [accounts[1], accounts[2], accounts[3], accounts[4], accounts[5], accounts[6], accounts[7], accounts[8]]
 
+  let voteStartAfterNumberOfCycles, voteCyclesDuration
+
   beforeEach(async () => {
     // Consensus
     let consensusImpl = await Consensus.new()
     proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
     consensus = await Consensus.at(proxy.address)
-    await consensus.initialize(toWei(toBN(10000), 'ether'), 24*60*60, 10, owner)
+    await consensus.initialize(toWei(toBN(10000), 'ether'), CYCLE_DURATION_BLOCKS, SNAPSHOTS_PER_CYCLE, owner)
 
     // ProxyStorage
     let proxyStorageImpl = await ProxyStorage.new()
@@ -85,33 +88,39 @@ contract('Voting', async (accounts) => {
 
   describe('initialize', async () => {
     it('should be successful', async () => {
-      await voting.initialize(MIN_BALLOT_DURATION_SECONDS).should.be.fulfilled
-      toBN(MIN_BALLOT_DURATION_SECONDS).should.be.bignumber.equal(await voting.getMinBallotDuration())
+      await voting.initialize(MIN_BALLOT_DURATION_CYCLES).should.be.fulfilled
+      toBN(MIN_BALLOT_DURATION_CYCLES).should.be.bignumber.equal(await voting.getMinBallotDurationCycles())
     })
     it('should fail if min ballot duration is bigger than max ballot duration', async () => {
-      let maxBallotDuration = await voting.getMaxBallotDuration()
-      await voting.initialize(maxBallotDuration.add(toBN(1))).should.be.rejectedWith(ERROR_MSG)
+      let maxBallotDurationCycles = await voting.getMaxBallotDurationCycles()
+      await voting.initialize(maxBallotDurationCycles.add(toBN(1))).should.be.rejectedWith(ERROR_MSG)
     })
   })
 
   describe('newBallot', async () => {
     beforeEach(async () => {
-      await voting.initialize(MIN_BALLOT_DURATION_SECONDS).should.be.fulfilled
-      VOTING_START_TIME = moment.utc().add(30, 'seconds').unix()
-      VOTING_END_TIME = moment.utc().add(10, 'days').unix()
+      await voting.initialize(MIN_BALLOT_DURATION_CYCLES).should.be.fulfilled
+      voteStartAfterNumberOfCycles = 1
+      voteCyclesDuration = 10
     })
     it('should be successful', async () => {
       let id = await voting.getNextBallotId()
       let proposedValue = RANDOM_ADDRESS
       let contractType = CONTRACT_TYPES.CONSENSUS
-      let {logs} = await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
+      let currentCycleEndBlock = await consensus.getCurrentCycleEndBlock()
+      let voteStartAfterNumberOfBlocks = toBN(voteStartAfterNumberOfCycles).mul(toBN(CYCLE_DURATION_BLOCKS))
+      let startBlock = currentCycleEndBlock.add(voteStartAfterNumberOfBlocks)
+      let voteEndAfterNumberOfBlocks = toBN(voteCyclesDuration).mul(toBN(CYCLE_DURATION_BLOCKS))
+      let endBlock = startBlock.add(voteEndAfterNumberOfBlocks)
+
+      let {logs} = await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
       logs.length.should.be.equal(1)
       logs[0].event.should.be.equal('BallotCreated')
       logs[0].args['id'].should.be.bignumber.equal(toBN(id))
       logs[0].args['creator'].should.be.equal(votingKeys[0])
       let ballotInfo = await voting.getBallotInfo(id, votingKeys[0])
-      ballotInfo.startTime.should.be.bignumber.equal(toBN(VOTING_START_TIME))
-      ballotInfo.endTime.should.be.bignumber.equal(toBN(VOTING_END_TIME))
+      ballotInfo.startBlock.should.be.bignumber.equal(startBlock)
+      ballotInfo.endBlock.should.be.bignumber.equal(endBlock)
       ballotInfo.totalVoters.should.be.bignumber.equal(toBN(0))
       ballotInfo.progress.should.be.bignumber.equal(toBN(0))
       ballotInfo.isFinalized.should.be.equal(false)
@@ -128,105 +137,99 @@ contract('Voting', async (accounts) => {
       let nonVotingKey = owner
       let proposedValue = RANDOM_ADDRESS
       let contractType = CONTRACT_TYPES.CONSENSUS
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: nonVotingKey}).should.be.rejectedWith(ERROR_MSG)
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: nonVotingKey}).should.be.rejectedWith(ERROR_MSG)
     })
-    it('should fail if times are invalid', async () => {
+    it('should fail if duration is invalid', async () => {
       let proposedValue = RANDOM_ADDRESS
       let contractType = CONTRACT_TYPES.CONSENSUS
 
-      // require(_startTime > 0 && _endTime > 0);
-      VOTING_START_TIME = 0
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
-      VOTING_END_TIME = 0
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
+      // require(_startAfterNumberOfCycles > 0);
+      await voting.newBallot(0, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
 
-      // require(_endTime > _startTime && _startTime > getTime());
-      VOTING_START_TIME = moment.utc().add(2, 'days').unix()
-      VOTING_END_TIME = moment.utc().add(1, 'days').unix()
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
+      // require (_cyclesDuration > 0);
+      await voting.newBallot(voteStartAfterNumberOfCycles, 0, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
 
-      VOTING_START_TIME = moment.utc().subtract(30, 'seconds').unix()
-      VOTING_END_TIME = moment.utc().add(1, 'days').unix()
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
+      // require(_cyclesDuration >= getMinBallotDurationCycles());
+      let minBallotDurationCycles = await voting.getMinBallotDurationCycles()
+      await voting.newBallot(voteStartAfterNumberOfCycles, minBallotDurationCycles.sub(toBN(1)), contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
 
-      // require(_endTime.sub(_startTime) > getMinBallotDuration());
-      let minBallotDurationSeconds = await voting.getMinBallotDuration()
-      VOTING_START_TIME = moment.utc().add(30, 'seconds').unix()
-      VOTING_END_TIME = moment.utc(VOTING_START_TIME).add(minBallotDurationSeconds - 60, 'seconds').unix()
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
-
-      // require(_endTime.sub(_startTime) <= getMaxBallotDuration());
-      let maxBallotDurationSeconds = await voting.getMaxBallotDuration()
-      VOTING_START_TIME = moment.utc().add(30, 'seconds').unix()
-      VOTING_END_TIME = moment.utc(VOTING_START_TIME).add(maxBallotDurationSeconds + 60, 'seconds').unix()
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
+      // require(_cyclesDuration <= getMaxBallotDurationCycles());
+      let maxBallotDurationCycles = await voting.getMaxBallotDurationCycles()
+      await voting.newBallot(voteStartAfterNumberOfCycles, maxBallotDurationCycles.add(toBN(1)), contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if proposed value is invalid', async () => {
       // require(_proposedValue != address(0));
       let proposedValue = ZERO_ADDRESS
       let contractType = CONTRACT_TYPES.CONSENSUS
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if contract type is invalid', async () => {
       let proposedValue = RANDOM_ADDRESS
       let contractType = CONTRACT_TYPES.INVALID
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if creating ballot over the ballots limit', async () => {
-      let maxLimitBallot = (await voting.getMaxLimitBallot()).toNumber()
+      let maxLimitOfBallots = (await voting.getMaxLimitOfBallots()).toNumber()
       let validatorsCount = (await consensus.currentValidatorsLength()).toNumber()
       let ballotLimitPerValidator = (await voting.getBallotLimitPerValidator()).toNumber()
-      ballotLimitPerValidator.should.be.equal(Math.floor(maxLimitBallot / validatorsCount))
+      ballotLimitPerValidator.should.be.equal(Math.floor(maxLimitOfBallots / validatorsCount))
       // create ballots successfully up to the limit
       let proposedValue = RANDOM_ADDRESS
       let contractType = CONTRACT_TYPES.CONSENSUS
       for (let i = 0; i < ballotLimitPerValidator; i++) {
-        let {logs} = await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
+        let {logs} = await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
       }
       // create a ballot over the limit should fail
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
       // create a ballot with different voting key successfully
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[1]}).should.be.fulfilled
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[1]}).should.be.fulfilled
     })
   })
 
   describe('vote', async () => {
     let id, proposedValue, contractType
     beforeEach(async () => {
-      await voting.initialize(MIN_BALLOT_DURATION_SECONDS).should.be.fulfilled
-      VOTING_START_TIME = moment.utc().add(30, 'seconds').unix()
-      VOTING_END_TIME = moment.utc().add(10, 'days').unix()
+      await voting.initialize(MIN_BALLOT_DURATION_CYCLES).should.be.fulfilled
+      voteStartAfterNumberOfCycles = 1
+      voteCyclesDuration = 10
       id = await voting.getNextBallotId()
       proposedValue = RANDOM_ADDRESS
       contractType = CONTRACT_TYPES.CONSENSUS
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
     })
     it('should vote "accept" successfully', async () => {
-      await voting.setTime(VOTING_START_TIME)
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteStartBlock = await voting.getStartBlock(id)
+      let blocksToAdvance = voteStartBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.toNumber())
       let {logs} = await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
       logs.length.should.be.equal(1)
       logs[0].event.should.be.equal('Vote')
       logs[0].args['id'].should.be.bignumber.equal(id)
       logs[0].args['decision'].should.be.bignumber.equal(toBN(ACTION_CHOICES.ACCEPT))
       logs[0].args['voter'].should.be.equal(votingKeys[0])
-      logs[0].args['time'].should.be.bignumber.equal(toBN(VOTING_START_TIME))
       toBN(1).should.be.bignumber.equal((await voting.getBallotInfo(id, votingKeys[0])).progress)
       toBN(1).should.be.bignumber.equal(await voting.getTotalVoters(id))
     })
     it('should vote "reject" successfully', async () => {
-      await voting.setTime(VOTING_START_TIME)
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteStartBlock = await voting.getStartBlock(id)
+      let blocksToAdvance = voteStartBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.toNumber())
       let {logs} = await voting.vote(id, ACTION_CHOICES.REJECT, {from: votingKeys[0]}).should.be.fulfilled
       logs.length.should.be.equal(1)
       logs[0].event.should.be.equal('Vote')
       logs[0].args['id'].should.be.bignumber.equal(id)
       logs[0].args['decision'].should.be.bignumber.equal(toBN(ACTION_CHOICES.REJECT))
       logs[0].args['voter'].should.be.equal(votingKeys[0])
-      logs[0].args['time'].should.be.bignumber.equal(toBN(VOTING_START_TIME))
       toBN(-1).should.be.bignumber.equal((await voting.getBallotInfo(id, votingKeys[0])).progress)
       toBN(1).should.be.bignumber.equal(await voting.getTotalVoters(id))
     })
     it('multiple voters should vote successfully', async () => {
-      await voting.setTime(VOTING_START_TIME)
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteStartBlock = await voting.getStartBlock(id)
+      let blocksToAdvance = voteStartBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.toNumber())
       await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
       toBN(1).should.be.bignumber.equal((await voting.getBallotInfo(id, votingKeys[0])).progress)
       toBN(1).should.be.bignumber.equal(await voting.getTotalVoters(id))
@@ -245,29 +248,47 @@ contract('Voting', async (accounts) => {
     })
     it('should fail if not called by valid voting key', async () => {
       let nonVotingKey = owner
-      await voting.setTime(VOTING_START_TIME)
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteStartBlock = await voting.getStartBlock(id)
+      let blocksToAdvance = voteStartBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.toNumber())
       await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: nonVotingKey}).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if voting before start time', async () => {
-      await voting.setTime(VOTING_START_TIME - 1)
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteStartBlock = await voting.getStartBlock(id)
+      let blocksToAdvance = voteStartBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.sub(toBN(1)).toNumber())
       await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if voting after end time', async () => {
-      await voting.setTime(VOTING_END_TIME + 1)
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteEndBlock = await voting.getEndBlock(id)
+      let blocksToAdvance = voteEndBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
       await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if trying to vote twice', async () => {
-      await voting.setTime(VOTING_START_TIME)
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteStartBlock = await voting.getStartBlock(id)
+      let blocksToAdvance = voteStartBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.toNumber())
       await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
       await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if trying to vote with invalid choice', async () => {
-      await voting.setTime(VOTING_START_TIME)
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteStartBlock = await voting.getStartBlock(id)
+      let blocksToAdvance = voteStartBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.toNumber())
       await voting.vote(id, ACTION_CHOICES.INVALID, {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
       await voting.vote(id, Object.keys(ACTION_CHOICES).length + 1, {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if trying to vote for invalid id', async () => {
-      await voting.setTime(VOTING_START_TIME)
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteStartBlock = await voting.getStartBlock(id)
+      let blocksToAdvance = voteStartBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.toNumber())
       await voting.vote(id.toNumber() + 1, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
       await voting.vote(id.toNumber() - 1, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
     })
@@ -275,20 +296,25 @@ contract('Voting', async (accounts) => {
 
   describe('finalize', async () => {
     beforeEach(async () => {
-      await voting.initialize(MIN_BALLOT_DURATION_SECONDS).should.be.fulfilled
-      VOTING_START_TIME = moment.utc().add(30, 'seconds').unix()
-      VOTING_END_TIME = moment.utc().add(10, 'days').unix()
+      await voting.initialize(MIN_BALLOT_DURATION_CYCLES).should.be.fulfilled
+      voteStartAfterNumberOfCycles = 1
+      voteCyclesDuration = 10
     })
     it('should change to proposed value successfully if quorum is reached', async () => {
       let id = await voting.getNextBallotId()
       let proposedValue = RANDOM_ADDRESS
       let contractType = CONTRACT_TYPES.CONSENSUS
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
-      await voting.setTime(VOTING_START_TIME)
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteStartBlock = await voting.getStartBlock(id)
+      let blocksToAdvance = voteStartBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.toNumber())
       await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
       await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[1]}).should.be.fulfilled
       await voting.vote(id, ACTION_CHOICES.REJECT, {from: votingKeys[2]}).should.be.fulfilled
-      await voting.setTime(VOTING_END_TIME + 1)
+      let voteEndBlock = await voting.getEndBlock(id)
+      blocksToAdvance = voteEndBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
       let {logs} = await voting.finalize(id, {from: votingKeys[0]}).should.be.fulfilled
       logs.length.should.be.equal(1)
       logs[0].event.should.be.equal('BallotFinalized')
@@ -296,8 +322,8 @@ contract('Voting', async (accounts) => {
       logs[0].args['finalizer'].should.be.equal(votingKeys[0])
       toBN(0).should.be.bignumber.equal(await voting.activeBallotsLength())
       let ballotInfo = await voting.getBallotInfo(id, votingKeys[0])
-      ballotInfo.startTime.should.be.bignumber.equal(toBN(VOTING_START_TIME))
-      ballotInfo.endTime.should.be.bignumber.equal(toBN(VOTING_END_TIME))
+      ballotInfo.startBlock.should.be.bignumber.equal(voteStartBlock)
+      ballotInfo.endBlock.should.be.bignumber.equal(voteEndBlock)
       ballotInfo.totalVoters.should.be.bignumber.equal(toBN(3))
       ballotInfo.progress.should.be.bignumber.equal(toBN(1))
       ballotInfo.isFinalized.should.be.equal(true)
@@ -315,12 +341,18 @@ contract('Voting', async (accounts) => {
       let id = await voting.getNextBallotId()
       let proposedValue = RANDOM_ADDRESS
       let contractType = CONTRACT_TYPES.CONSENSUS
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
-      await voting.setTime(VOTING_START_TIME)
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteStartBlock = await voting.getStartBlock(id)
+      let blocksToAdvance = voteStartBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.toNumber())
       await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
       await voting.vote(id, ACTION_CHOICES.REJECT, {from: votingKeys[1]}).should.be.fulfilled
       await voting.vote(id, ACTION_CHOICES.REJECT, {from: votingKeys[2]}).should.be.fulfilled
-      await voting.setTime(VOTING_END_TIME + 1)
+      currentBlock = await voting.getCurrentBlockNumber()
+      let voteEndBlock = await voting.getEndBlock(id)
+      blocksToAdvance = voteEndBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
       let {logs} = await voting.finalize(id, {from: votingKeys[0]}).should.be.fulfilled
       logs.length.should.be.equal(1)
       logs[0].event.should.be.equal('BallotFinalized')
@@ -328,8 +360,8 @@ contract('Voting', async (accounts) => {
       logs[0].args['finalizer'].should.be.equal(votingKeys[0])
       toBN(0).should.be.bignumber.equal(await voting.activeBallotsLength())
       let ballotInfo = await voting.getBallotInfo(id, votingKeys[0])
-      ballotInfo.startTime.should.be.bignumber.equal(toBN(VOTING_START_TIME))
-      ballotInfo.endTime.should.be.bignumber.equal(toBN(VOTING_END_TIME))
+      ballotInfo.startBlock.should.be.bignumber.equal(voteStartBlock)
+      ballotInfo.endBlock.should.be.bignumber.equal(voteEndBlock)
       ballotInfo.totalVoters.should.be.bignumber.equal(toBN(3))
       ballotInfo.progress.should.be.bignumber.equal(toBN(-1))
       ballotInfo.isFinalized.should.be.equal(true)
@@ -347,37 +379,30 @@ contract('Voting', async (accounts) => {
       let id = await voting.getNextBallotId()
       let proposedValue = RANDOM_ADDRESS
       let contractType = CONTRACT_TYPES.CONSENSUS
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
-      await voting.setTime(VOTING_START_TIME)
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteStartBlock = await voting.getStartBlock(id)
+      let blocksToAdvance = voteStartBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.toNumber())
       await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
       await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[1]}).should.be.fulfilled
       await voting.vote(id, ACTION_CHOICES.REJECT, {from: votingKeys[2]}).should.be.fulfilled
-      await voting.setTime(VOTING_END_TIME + 1)
+      currentBlock = await voting.getCurrentBlockNumber()
+      let voteEndBlock = await voting.getEndBlock(id)
+      blocksToAdvance = voteEndBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
       await voting.finalize(id, {from: votingKeys[0]}).should.be.fulfilled
       await voting.finalize(id, {from: votingKeys[0]}).should.be.rejectedWith(ERROR_MSG)
-    })
-    it('should be allowed after all possible voters have voted even if end time not passed', async () => {
-      let id = await voting.getNextBallotId()
-      let proposedValue = RANDOM_ADDRESS
-      let contractType = CONTRACT_TYPES.CONSENSUS
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
-      await voting.setTime(VOTING_START_TIME + MIN_BALLOT_DURATION_SECONDS + 1)
-      await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
-      await voting.vote(id, ACTION_CHOICES.REJECT, {from: votingKeys[1]}).should.be.fulfilled
-      await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[2]}).should.be.fulfilled
-      await voting.vote(id, ACTION_CHOICES.REJECT, {from: votingKeys[3]}).should.be.fulfilled
-      await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[4]}).should.be.fulfilled
-      await voting.vote(id, ACTION_CHOICES.REJECT, {from: votingKeys[5]}).should.be.fulfilled
-      await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[6]}).should.be.fulfilled
-      await voting.vote(id, ACTION_CHOICES.REJECT, {from: votingKeys[7]}).should.be.fulfilled
-      await voting.finalize(id, {from: votingKeys[0]}).should.be.fulfilled
     })
     it('should be allowed after end time has passed even if not all voters have voted', async () => {
       let id = await voting.getNextBallotId()
       let proposedValue = RANDOM_ADDRESS
       let contractType = CONTRACT_TYPES.CONSENSUS
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
-      await voting.setTime(VOTING_END_TIME + 1)
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteEndBlock = await voting.getEndBlock(id)
+      let blocksToAdvance = voteEndBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
       await voting.finalize(id, {from: votingKeys[0]}).should.be.fulfilled
     })
     it('should fail if not called by valid voting key', async () => {
@@ -385,8 +410,11 @@ contract('Voting', async (accounts) => {
       let id = await voting.getNextBallotId()
       let proposedValue = RANDOM_ADDRESS
       let contractType = CONTRACT_TYPES.CONSENSUS
-      await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
-      await voting.setTime(VOTING_END_TIME + 1)
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteEndBlock = await voting.getEndBlock(id)
+      let blocksToAdvance = voteEndBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
       await voting.finalize(id, {from: nonVotingKey}).should.be.rejectedWith(ERROR_MSG)
     })
     describe('should change all contract types implementations', async () => {
@@ -394,12 +422,18 @@ contract('Voting', async (accounts) => {
         let id = await voting.getNextBallotId()
         let proposedValue = RANDOM_ADDRESS
         let contractType = CONTRACT_TYPES.CONSENSUS
-        await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
-        await voting.setTime(VOTING_START_TIME)
+        await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
+        let currentBlock = await voting.getCurrentBlockNumber()
+        let voteStartBlock = await voting.getStartBlock(id)
+        let blocksToAdvance = voteStartBlock.sub(currentBlock)
+        await advanceBlocks(blocksToAdvance.toNumber())
         await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
         await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[1]}).should.be.fulfilled
         await voting.vote(id, ACTION_CHOICES.REJECT, {from: votingKeys[2]}).should.be.fulfilled
-        await voting.setTime(VOTING_END_TIME + 1)
+        currentBlock = await voting.getCurrentBlockNumber()
+        let voteEndBlock = await voting.getEndBlock(id)
+        blocksToAdvance = voteEndBlock.sub(currentBlock)
+        await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
         await voting.finalize(id, {from: votingKeys[0]}).should.be.fulfilled
         proposedValue.should.be.equal(await (await EternalStorageProxy.at(await proxyStorage.getConsensus())).getImplementation())
       })
@@ -407,12 +441,18 @@ contract('Voting', async (accounts) => {
         let id = await voting.getNextBallotId()
         let proposedValue = RANDOM_ADDRESS
         let contractType = CONTRACT_TYPES.BLOCK_REWARD
-        await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
-        await voting.setTime(VOTING_START_TIME)
+        await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
+        let currentBlock = await voting.getCurrentBlockNumber()
+        let voteStartBlock = await voting.getStartBlock(id)
+        let blocksToAdvance = voteStartBlock.sub(currentBlock)
+        await advanceBlocks(blocksToAdvance.toNumber())
         await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
         await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[1]}).should.be.fulfilled
         await voting.vote(id, ACTION_CHOICES.REJECT, {from: votingKeys[2]}).should.be.fulfilled
-        await voting.setTime(VOTING_END_TIME + 1)
+        currentBlock = await voting.getCurrentBlockNumber()
+        let voteEndBlock = await voting.getEndBlock(id)
+        blocksToAdvance = voteEndBlock.sub(currentBlock)
+        await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
         await voting.finalize(id, {from: votingKeys[0]}).should.be.fulfilled
         proposedValue.should.be.equal(await (await EternalStorageProxy.at(await proxyStorage.getBlockReward())).getImplementation())
       })
@@ -420,12 +460,18 @@ contract('Voting', async (accounts) => {
         let id = await voting.getNextBallotId()
         let proposedValue = RANDOM_ADDRESS
         let contractType = CONTRACT_TYPES.PROXY_STORAGE
-        await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
-        await voting.setTime(VOTING_START_TIME)
+        await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
+        let currentBlock = await voting.getCurrentBlockNumber()
+        let voteStartBlock = await voting.getStartBlock(id)
+        let blocksToAdvance = voteStartBlock.sub(currentBlock)
+        await advanceBlocks(blocksToAdvance.toNumber())
         await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
         await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[1]}).should.be.fulfilled
         await voting.vote(id, ACTION_CHOICES.REJECT, {from: votingKeys[2]}).should.be.fulfilled
-        await voting.setTime(VOTING_END_TIME + 1)
+        currentBlock = await voting.getCurrentBlockNumber()
+        let voteEndBlock = await voting.getEndBlock(id)
+        blocksToAdvance = voteEndBlock.sub(currentBlock)
+        await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
         await voting.finalize(id, {from: votingKeys[0]}).should.be.fulfilled
         proposedValue.should.be.equal(await (await EternalStorageProxy.at(proxyStorage.address)).getImplementation())
       })
@@ -433,12 +479,18 @@ contract('Voting', async (accounts) => {
         let id = await voting.getNextBallotId()
         let proposedValue = RANDOM_ADDRESS
         let contractType = CONTRACT_TYPES.VOTING
-        await voting.newBallot(VOTING_START_TIME, VOTING_END_TIME, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
-        await voting.setTime(VOTING_START_TIME)
+        await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: votingKeys[0]}).should.be.fulfilled
+        let currentBlock = await voting.getCurrentBlockNumber()
+        let voteStartBlock = await voting.getStartBlock(id)
+        let blocksToAdvance = voteStartBlock.sub(currentBlock)
+        await advanceBlocks(blocksToAdvance.toNumber())
         await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[0]}).should.be.fulfilled
         await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: votingKeys[1]}).should.be.fulfilled
         await voting.vote(id, ACTION_CHOICES.REJECT, {from: votingKeys[2]}).should.be.fulfilled
-        await voting.setTime(VOTING_END_TIME + 1)
+        currentBlock = await voting.getCurrentBlockNumber()
+        let voteEndBlock = await voting.getEndBlock(id)
+        blocksToAdvance = voteEndBlock.sub(currentBlock)
+        await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
         await voting.finalize(id, {from: votingKeys[0]}).should.be.fulfilled
         proposedValue.should.be.equal(await (await EternalStorageProxy.at(await proxyStorage.getVoting())).getImplementation())
       })
@@ -483,7 +535,7 @@ contract('Voting', async (accounts) => {
       await proxy.setProxyStorageMock(proxyStorage.address)
       votingNew = await Voting.at(proxy.address)
       false.should.be.equal(await votingNew.isInitialized())
-      await votingNew.initialize(MIN_BALLOT_DURATION_SECONDS).should.be.fulfilled
+      await votingNew.initialize(MIN_BALLOT_DURATION_CYCLES).should.be.fulfilled
       true.should.be.equal(await votingNew.isInitialized())
     })
     it('should use same proxyStorage after upgrade', async () => {
@@ -493,12 +545,12 @@ contract('Voting', async (accounts) => {
       proxyStorageStub.should.be.equal(await votingNew.getProxyStorage())
     })
     it('should use same storage after upgrade', async () => {
-      let newValue = MIN_BALLOT_DURATION_SECONDS + 60
-      await voting.setMinBallotDurationMock(newValue)
+      let newValue = MIN_BALLOT_DURATION_CYCLES + 1
+      await voting.setMinBallotDurationCyclesMock(newValue)
       await proxy.setProxyStorageMock(proxyStorageStub)
       await proxy.upgradeTo(votingNew.address, {from: proxyStorageStub})
       votingNew = await Voting.at(proxy.address)
-      toBN(newValue).should.be.bignumber.equal(await votingNew.getMinBallotDuration())
+      toBN(newValue).should.be.bignumber.equal(await votingNew.getMinBallotDurationCycles())
     })
   })
 })

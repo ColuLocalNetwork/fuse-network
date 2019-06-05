@@ -47,9 +47,8 @@ contract VotingBase {
   * @param id ballot id
   * @param decision voter decision (see VotingBase.ActionChoices)
   * @param voter address of the voter
-  * @param time time of the vote
   */
-  event Vote(uint256 indexed id, uint256 decision, address indexed voter, uint256 time);
+  event Vote(uint256 indexed id, uint256 decision, address indexed voter);
 
   /**
   * @dev Function to be called when voting on a ballot
