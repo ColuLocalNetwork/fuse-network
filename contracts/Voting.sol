@@ -1,15 +1,16 @@
 pragma solidity ^0.4.24;
 
 import "./abstracts/VotingBase.sol";
+import "./interfaces/IConsensus.sol";
+import "./interfaces/IVoting.sol";
 import "./eternal-storage/EternalStorage.sol";
 import "./ProxyStorage.sol";
-import "./Consensus.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 /**
 * @title Contract handling vote to change implementations network contracts
 */
-contract Voting is EternalStorage, VotingBase {
+contract Voting is EternalStorage, VotingBase, IVoting {
   using SafeMath for uint256;
 
   uint256 public constant DECIMALS = 10 ** 18;
@@ -125,7 +126,7 @@ contract Voting is EternalStorage, VotingBase {
   */
   function isValidVotingKey(address _address) public view returns(bool) {
     bool valid = false;
-    Consensus consensus = Consensus(ProxyStorage(getProxyStorage()).getConsensus());
+    IConsensus consensus = IConsensus(ProxyStorage(getProxyStorage()).getConsensus());
     for (uint256 i = 0; i < consensus.currentValidatorsLength(); i++) {
       address validator = consensus.currentValidatorsAtPosition(i);
       if (validator == _address) {
@@ -245,7 +246,7 @@ contract Voting is EternalStorage, VotingBase {
   * @dev Function to be called by the consensus contract when a cycles ends
   * In this function, all active ballots votes will be counted and updated according to the current validators
   */
-  function onCycleEnd(address[] validators) public onlyConsensus {
+  function onCycleEnd(address[] validators) external onlyConsensus {
     uint256 numOfValidators = validators.length;
     if (numOfValidators == 0) {
       return;
@@ -360,7 +361,7 @@ contract Voting is EternalStorage, VotingBase {
   }
 
   function setStartBlock(uint256 _id, uint256 _startAfterNumberOfCycles) private {
-    Consensus consensus = Consensus(ProxyStorage(getProxyStorage()).getConsensus());
+    IConsensus consensus = IConsensus(ProxyStorage(getProxyStorage()).getConsensus());
     uint256 cycleDurationBlocks = consensus.getCycleDurationBlocks();
     uint256 currentCycleEndBlock = consensus.getCurrentCycleEndBlock();
     uint256 startBlock = currentCycleEndBlock.add(_startAfterNumberOfCycles.mul(cycleDurationBlocks));
@@ -372,7 +373,7 @@ contract Voting is EternalStorage, VotingBase {
   }
 
   function setEndBlock(uint256 _id, uint256 _cyclesDuration) private {
-    uint256 cycleDurationBlocks = Consensus(ProxyStorage(getProxyStorage()).getConsensus()).getCycleDurationBlocks();
+    uint256 cycleDurationBlocks = IConsensus(ProxyStorage(getProxyStorage()).getConsensus()).getCycleDurationBlocks();
     uint256 startBlock = getStartBlock(_id);
     uint256 endBlock = startBlock.add(_cyclesDuration.mul(cycleDurationBlocks));
     uintStorage[keccak256(abi.encodePacked("votingState", _id, "endBlock"))] = endBlock;
@@ -481,7 +482,7 @@ contract Voting is EternalStorage, VotingBase {
   }
 
   function getTotalNumberOfValidators() private view returns(uint256) {
-    return Consensus(ProxyStorage(getProxyStorage()).getConsensus()).currentValidatorsLength();
+    return IConsensus(ProxyStorage(getProxyStorage()).getConsensus()).currentValidatorsLength();
   }
 
   function setVoterChoice(uint256 _id, address _key, uint256 _choice) private {

@@ -1,15 +1,16 @@
 pragma solidity ^0.4.24;
 
 import "./abstracts/ValidatorSet.sol";
+import "./interfaces/IConsensus.sol";
+import "./interfaces/IVoting.sol";
 import "./eternal-storage/EternalStorage.sol";
 import "./ProxyStorage.sol";
-import "./Voting.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 /**
 * @title Contract handling PoS consensus logic
 */
-contract Consensus is EternalStorage, ValidatorSet {
+contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   using SafeMath for uint256;
 
   /**
@@ -132,9 +133,9 @@ contract Consensus is EternalStorage, ValidatorSet {
   /**
   * @dev Function to be called by the block reward contract each block to handle cycles and snapshots logic
   */
-  function cycle() public onlyBlockReward {
+  function cycle() external onlyBlockReward {
     if (hasCycleEnded()) {
-      Voting(ProxyStorage(getProxyStorage()).getVoting()).onCycleEnd(currentValidators());
+      IVoting(ProxyStorage(getProxyStorage()).getVoting()).onCycleEnd(currentValidators());
       uint randomSnapshotId = getRandom(0, getSnapshotsPerCycle() - 1);
       setNewValidatorSet(getSnapshot(randomSnapshotId));
       setFinalized(false);
