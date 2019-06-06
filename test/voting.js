@@ -316,7 +316,7 @@ contract('Voting', async (accounts) => {
       toBN(0).should.be.bignumber.equal(await voting.getAccepted(id))
       toBN(0).should.be.bignumber.equal(await voting.getRejected(id))
     })
-    it('gloden flow should work', async () => {
+    it('golden flow should work', async () => {
       let currentValidators = await consensus.getValidators()
       let nonValidatorKey = owner
       let decimals = await voting.DECIMALS()

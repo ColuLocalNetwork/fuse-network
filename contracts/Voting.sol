@@ -251,8 +251,9 @@ contract Voting is EternalStorage, VotingBase, IVoting {
     if (numOfValidators == 0) {
       return;
     }
-    for (uint i = 0; i < activeBallotsLength(); i++) {
-      uint256 ballotId = activeBallots(i);
+    uint[] memory ballots = activeBallots();
+    for (uint i = 0; i < ballots.length; i++) {
+      uint256 ballotId = ballots[i];
       if (isOpenBallotAndNotFinalized(ballotId)) {
         uint256 accepts = 0;
         uint256 rejects = 0;
@@ -292,7 +293,7 @@ contract Voting is EternalStorage, VotingBase, IVoting {
       setQuorumState(_id, uint256(QuorumStates.Rejected));
     }
 
-    // deactivateBallot(_id); // TODO
+    deactivateBallot(_id);
     setIsFinalized(_id, true);
     emit BallotFinalized(_id);
   }
@@ -300,7 +301,7 @@ contract Voting is EternalStorage, VotingBase, IVoting {
   function deactivateBallot(uint256 _id) private {
     uint256 removedIndex = getIndex(_id);
     uint256 lastIndex = activeBallotsLength() - 1;
-    uint256 lastBallotId = activeBallots(lastIndex);
+    uint256 lastBallotId = activeBallotsAtIndex(lastIndex);
 
     // Override the removed ballot with the last one.
     activeBallotsSet(removedIndex, lastBallotId);
@@ -419,11 +420,11 @@ contract Voting is EternalStorage, VotingBase, IVoting {
     uintStorage[keccak256(abi.encodePacked("votingState", _id, "index"))] = _value;
   }
 
-  function activeBallotsAll() public view returns(uint[]) {
+  function activeBallots() public view returns(uint[]) {
     return uintArrayStorage[keccak256(abi.encodePacked("activeBallots"))];
   }
 
-  function activeBallots(uint256 _index) public view returns(uint256) {
+  function activeBallotsAtIndex(uint256 _index) public view returns(uint256) {
     return uintArrayStorage[keccak256(abi.encodePacked("activeBallots"))][_index];
   }
 
