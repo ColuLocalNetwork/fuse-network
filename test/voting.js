@@ -16,7 +16,7 @@ const QUORUM_STATES = { INVALID: 0, IN_PROGRESS: 1, ACCEPTED: 2, REJECTED: 3 }
 const ACTION_CHOICES = { INVALID: 0, ACCEPT: 1, REJECT: 2 }
 
 contract('Voting', async (accounts) => {
-  let consensus, proxy, proxyStorage
+  let consensus, consensusImpl, proxy, proxyStorage, proxyStorageImpl, blockReward, blockRewardImpl
   let votingImpl, voting
   let owner = accounts[0]
   let validators = [accounts[1], accounts[2], accounts[3], accounts[4], accounts[5], accounts[6], accounts[7], accounts[8]]
@@ -25,22 +25,22 @@ contract('Voting', async (accounts) => {
 
   beforeEach(async () => {
     // Consensus
-    let consensusImpl = await Consensus.new()
+    consensusImpl = await Consensus.new()
     proxy = await EternalStorageProxy.new(ZERO_ADDRESS, consensusImpl.address)
     consensus = await Consensus.at(proxy.address)
     await consensus.initialize(toWei(toBN(10000), 'ether'), CYCLE_DURATION_BLOCKS, SNAPSHOTS_PER_CYCLE, owner)
 
     // ProxyStorage
-    let proxyStorageImpl = await ProxyStorage.new()
+    proxyStorageImpl = await ProxyStorage.new()
     proxy = await EternalStorageProxy.new(ZERO_ADDRESS, proxyStorageImpl.address)
     proxyStorage = await ProxyStorage.at(proxy.address)
     await proxyStorage.initialize(consensus.address)
     await consensus.setProxyStorage(proxyStorage.address)
 
     // BlockReward
-    let blockRewardImpl = await BlockReward.new()
+    blockRewardImpl = await BlockReward.new()
     proxy = await EternalStorageProxy.new(proxyStorage.address, blockRewardImpl.address)
-    let blockReward = await BlockReward.at(proxy.address)
+    blockReward = await BlockReward.at(proxy.address)
     await blockReward.initialize(toWei(toBN(10), 'ether'))
 
     // Voting
@@ -112,13 +112,12 @@ contract('Voting', async (accounts) => {
       ballotInfo.canBeFinalizedNow.should.be.equal(false)
       ballotInfo.alreadyVoted.should.be.equal(false)
       toBN(QUORUM_STATES.IN_PROGRESS).should.be.bignumber.equal(await voting.getQuorumState(id))
-      toBN(0).should.be.bignumber.equal(await voting.getIndex(id))
     })
     it('should fail if not called by valid voting key', async () => {
-      let nonVotingKey = owner
+      let nonValidatorKey = owner
       let proposedValue = RANDOM_ADDRESS
       let contractType = CONTRACT_TYPES.CONSENSUS
-      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: nonVotingKey}).should.be.rejectedWith(ERROR_MSG)
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: nonValidatorKey}).should.be.rejectedWith(ERROR_MSG)
     })
     it('should fail if duration is invalid', async () => {
       let proposedValue = RANDOM_ADDRESS
@@ -277,16 +276,313 @@ contract('Voting', async (accounts) => {
     })
   })
 
-  describe('finalize', async () => {
+  describe('onCycleEnd', async () => {
     beforeEach(async () => {
       await voting.initialize(MIN_BALLOT_DURATION_CYCLES).should.be.fulfilled
       voteStartAfterNumberOfCycles = 1
       voteCyclesDuration = 10
     })
-    it('should change to proposed value successfully if quorum is reached', async () => {
+    it('should only be called by Consensus', async () => {
+      await voting.onCycleEnd([RANDOM_ADDRESS]).should.be.rejectedWith(ERROR_MSG)
+      await proxyStorage.setConsensusMock(owner)
+      await voting.onCycleEnd([RANDOM_ADDRESS]).should.be.fulfilled
+    })
+    it('should work when there are no validators (should not happen)', async () => {
+      await proxyStorage.setConsensusMock(owner)
+      await voting.onCycleEnd([]).should.be.fulfilled
+    })
+    it('should work when there are no active ballots', async () => {
+      await proxyStorage.setConsensusMock(owner)
+      toBN(0).should.be.bignumber.equal(await voting.activeBallotsLength())
+      let currentValidators = await consensus.getValidators()
+      currentValidators.length.should.be.gte(0)
+      await voting.onCycleEnd(currentValidators).should.be.fulfilled
+    })
+    it('should work when there is one active ballot - no votes yet', async () => {
+      let currentValidators = await consensus.getValidators()
+
       let id = await voting.getNextBallotId()
       let proposedValue = RANDOM_ADDRESS
       let contractType = CONTRACT_TYPES.CONSENSUS
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: validators[0]}).should.be.fulfilled
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteStartBlock = await voting.getStartBlock(id)
+      let blocksToAdvance = voteStartBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.toNumber())
+      toBN(1).should.be.bignumber.equal(await voting.activeBallotsLength())
+
+      await proxyStorage.setConsensusMock(owner)
+      await voting.onCycleEnd(currentValidators).should.be.fulfilled
+      toBN(0).should.be.bignumber.equal(await voting.getAccepted(id))
+      toBN(0).should.be.bignumber.equal(await voting.getRejected(id))
+    })
+    it('gloden flow should work', async () => {
+      let currentValidators = await consensus.getValidators()
+      let nonValidatorKey = owner
+      let decimals = await voting.DECIMALS()
+      // create 1st ballot
+      let firstBallotId = await voting.getNextBallotId()
+      let proposedValue = RANDOM_ADDRESS
+      let contractType = CONTRACT_TYPES.BLOCK_REWARD
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: validators[0]}).should.be.fulfilled
+
+      // create 2nd ballot
+      let secondBallotId = await voting.getNextBallotId()
+      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: validators[0]}).should.be.fulfilled
+
+      // create 3rd ballot
+      let thirdBallotId = await voting.getNextBallotId()
+      await voting.newBallot(voteStartAfterNumberOfCycles*2, voteCyclesDuration, contractType, proposedValue, 'description', {from: validators[0]}).should.be.fulfilled
+
+      // advance blocks until 1sr and 2nd ballots are open
+      let currentBlock = await voting.getCurrentBlockNumber()
+      let voteStartBlock = await voting.getStartBlock(firstBallotId)
+      let blocksToAdvance = voteStartBlock.sub(currentBlock)
+      await advanceBlocks(blocksToAdvance.toNumber())
+      true.should.be.equal(await voting.isActiveBallot(firstBallotId))
+      true.should.be.equal(await voting.isActiveBallot(secondBallotId))
+      false.should.be.equal(await voting.isActiveBallot(thirdBallotId))
+
+      // check votes
+      let expected = {
+        first: {
+          accepted: toBN(0),
+          rejected: toBN(0)
+        },
+        second: {
+          accepted: toBN(0),
+          rejected: toBN(0)
+        },
+        third: {
+          accepted: toBN(0),
+          rejected: toBN(0)
+        }
+      }
+      expected.first.accepted.should.be.bignumber.equal(await voting.getAccepted(firstBallotId))
+      expected.first.rejected.should.be.bignumber.equal(await voting.getRejected(firstBallotId))
+      expected.second.accepted.should.be.bignumber.equal(await voting.getAccepted(secondBallotId))
+      expected.second.rejected.should.be.bignumber.equal(await voting.getRejected(secondBallotId))
+      expected.third.accepted.should.be.bignumber.equal(await voting.getAccepted(thirdBallotId))
+      expected.third.rejected.should.be.bignumber.equal(await voting.getRejected(thirdBallotId))
+
+      // vote on 1st ballot
+      await voting.vote(firstBallotId, ACTION_CHOICES.ACCEPT, {from: validators[0]}).should.be.fulfilled
+      await voting.vote(firstBallotId, ACTION_CHOICES.REJECT, {from: validators[1]}).should.be.fulfilled
+      await voting.vote(firstBallotId, ACTION_CHOICES.ACCEPT, {from: validators[2]}).should.be.fulfilled
+      await voting.vote(firstBallotId, ACTION_CHOICES.ACCEPT, {from: nonValidatorKey}).should.be.fulfilled
+
+      // vote on 2nd ballot
+      await voting.vote(secondBallotId, ACTION_CHOICES.REJECT, {from: validators[0]}).should.be.fulfilled
+      await voting.vote(secondBallotId, ACTION_CHOICES.ACCEPT, {from: validators[1]}).should.be.fulfilled
+      await voting.vote(secondBallotId, ACTION_CHOICES.REJECT, {from: validators[2]}).should.be.fulfilled
+      await voting.vote(secondBallotId, ACTION_CHOICES.ACCEPT, {from: nonValidatorKey}).should.be.fulfilled
+
+      // check votes
+      expected = {
+        first: {
+          accepted: toBN(0),
+          rejected: toBN(0)
+        },
+        second: {
+          accepted: toBN(0),
+          rejected: toBN(0)
+        },
+        third: {
+          accepted: toBN(0),
+          rejected: toBN(0)
+        }
+      }
+      expected.first.accepted.should.be.bignumber.equal(await voting.getAccepted(firstBallotId))
+      expected.first.rejected.should.be.bignumber.equal(await voting.getRejected(firstBallotId))
+      expected.second.accepted.should.be.bignumber.equal(await voting.getAccepted(secondBallotId))
+      expected.second.rejected.should.be.bignumber.equal(await voting.getRejected(secondBallotId))
+      expected.third.accepted.should.be.bignumber.equal(await voting.getAccepted(thirdBallotId))
+      expected.third.rejected.should.be.bignumber.equal(await voting.getRejected(thirdBallotId))
+
+      // end cycle and check votes
+      currentBlock = await voting.getCurrentBlockNumber()
+      let currentCycleEndBlock = await consensus.getCurrentCycleEndBlock()
+      await advanceBlocks(currentCycleEndBlock.sub(currentBlock).toNumber())
+      await proxyStorage.setConsensusMock(owner)
+      await voting.onCycleEnd(currentValidators).should.be.fulfilled
+      expected = {
+        first: {
+          accepted: toBN(2).mul(decimals).div(toBN(8)),
+          rejected: toBN(1).mul(decimals).div(toBN(8))
+        },
+        second: {
+          accepted: toBN(1).mul(decimals).div(toBN(8)),
+          rejected: toBN(2).mul(decimals).div(toBN(8))
+        },
+        third: {
+          accepted: toBN(0),
+          rejected: toBN(0)
+        }
+      }
+      expected.first.accepted.should.be.bignumber.equal(await voting.getAccepted(firstBallotId))
+      expected.first.rejected.should.be.bignumber.equal(await voting.getRejected(firstBallotId))
+      expected.second.accepted.should.be.bignumber.equal(await voting.getAccepted(secondBallotId))
+      expected.second.rejected.should.be.bignumber.equal(await voting.getRejected(secondBallotId))
+      expected.third.accepted.should.be.bignumber.equal(await voting.getAccepted(thirdBallotId))
+      expected.third.rejected.should.be.bignumber.equal(await voting.getRejected(thirdBallotId))
+
+      // advance until 3rd ballot is open
+      currentBlock = await voting.getCurrentBlockNumber()
+      voteStartBlock = await voting.getStartBlock(thirdBallotId)
+      await advanceBlocks(voteStartBlock.sub(currentBlock).toNumber())
+      true.should.be.equal(await voting.isActiveBallot(firstBallotId))
+      true.should.be.equal(await voting.isActiveBallot(secondBallotId))
+      true.should.be.equal(await voting.isActiveBallot(thirdBallotId))
+
+      // vote on 1st ballot
+      await voting.vote(firstBallotId, ACTION_CHOICES.ACCEPT, {from: validators[3]}).should.be.fulfilled
+      await voting.vote(firstBallotId, ACTION_CHOICES.REJECT, {from: validators[4]}).should.be.fulfilled
+      await voting.vote(firstBallotId, ACTION_CHOICES.ACCEPT, {from: validators[5]}).should.be.fulfilled
+      await voting.vote(firstBallotId, ACTION_CHOICES.ACCEPT, {from: validators[6]}).should.be.fulfilled
+
+      // vote on 2nd ballot
+      await voting.vote(secondBallotId, ACTION_CHOICES.REJECT, {from: validators[3]}).should.be.fulfilled
+      await voting.vote(secondBallotId, ACTION_CHOICES.ACCEPT, {from: validators[4]}).should.be.fulfilled
+
+      // vote on 3rd ballot
+      await voting.vote(thirdBallotId, ACTION_CHOICES.ACCEPT, {from: validators[0]}).should.be.fulfilled
+      await voting.vote(thirdBallotId, ACTION_CHOICES.ACCEPT, {from: validators[1]}).should.be.fulfilled
+      await voting.vote(thirdBallotId, ACTION_CHOICES.ACCEPT, {from: validators[2]}).should.be.fulfilled
+      await voting.vote(thirdBallotId, ACTION_CHOICES.REJECT, {from: nonValidatorKey}).should.be.fulfilled
+
+      // check votes
+      expected = {
+        first: {
+          accepted: toBN(2).mul(decimals).div(toBN(8)),
+          rejected: toBN(1).mul(decimals).div(toBN(8))
+        },
+        second: {
+          accepted: toBN(1).mul(decimals).div(toBN(8)),
+          rejected: toBN(2).mul(decimals).div(toBN(8))
+        },
+        third: {
+          accepted: toBN(0),
+          rejected: toBN(0)
+        }
+      }
+      expected.first.accepted.should.be.bignumber.equal(await voting.getAccepted(firstBallotId))
+      expected.first.rejected.should.be.bignumber.equal(await voting.getRejected(firstBallotId))
+      expected.second.accepted.should.be.bignumber.equal(await voting.getAccepted(secondBallotId))
+      expected.second.rejected.should.be.bignumber.equal(await voting.getRejected(secondBallotId))
+      expected.third.accepted.should.be.bignumber.equal(await voting.getAccepted(thirdBallotId))
+      expected.third.rejected.should.be.bignumber.equal(await voting.getRejected(thirdBallotId))
+
+      // make non validator a validator so its votes will count as well
+      validators.push(nonValidatorKey)
+      await proxyStorage.setConsensusMock(consensus.address)
+      await consensus.setNewValidatorSetMock(validators)
+      await consensus.setSystemAddressMock(owner, {from: owner})
+      await consensus.setFinalizedMock(false, {from: owner})
+      await consensus.finalizeChange().should.be.fulfilled
+      currentValidators = await consensus.getValidators()
+      currentValidators[8].should.be.equal(nonValidatorKey)
+      true.should.be.equal(await voting.isValidVotingKey(validators[8]))
+
+      // advance until 1st and 2nd ballots are closed
+      currentBlock = await voting.getCurrentBlockNumber()
+      voteEndBlock = await voting.getEndBlock(firstBallotId)
+      await advanceBlocks(voteEndBlock.sub(currentBlock).add(toBN(1)).toNumber())
+      false.should.be.equal(await voting.isActiveBallot(firstBallotId))
+      false.should.be.equal(await voting.isActiveBallot(secondBallotId))
+      true.should.be.equal(await voting.isActiveBallot(thirdBallotId))
+
+      // end cycle and check votes
+      currentBlock = await voting.getCurrentBlockNumber()
+      currentCycleEndBlock = await consensus.getCurrentCycleEndBlock()
+      await advanceBlocks(currentCycleEndBlock.sub(currentBlock).toNumber())
+      await proxyStorage.setConsensusMock(owner)
+      await voting.onCycleEnd(currentValidators).should.be.fulfilled
+      expected = {
+        first: {
+          accepted: toBN(2).mul(decimals).div(toBN(8)).add(toBN(6).mul(decimals).div(toBN(9))),
+          rejected: toBN(1).mul(decimals).div(toBN(8)).add(toBN(2).mul(decimals).div(toBN(9)))
+        },
+        second: {
+          accepted: toBN(1).mul(decimals).div(toBN(8)).add(toBN(3).mul(decimals).div(toBN(9))),
+          rejected: toBN(2).mul(decimals).div(toBN(8)).add(toBN(3).mul(decimals).div(toBN(9)))
+        },
+        third: {
+          accepted: toBN(3).mul(decimals).div(toBN(9)),
+          rejected: toBN(1).mul(decimals).div(toBN(9))
+        }
+      }
+      expected.first.accepted.should.be.bignumber.equal(await voting.getAccepted(firstBallotId))
+      expected.first.rejected.should.be.bignumber.equal(await voting.getRejected(firstBallotId))
+      expected.second.accepted.should.be.bignumber.equal(await voting.getAccepted(secondBallotId))
+      expected.second.rejected.should.be.bignumber.equal(await voting.getRejected(secondBallotId))
+      expected.third.accepted.should.be.bignumber.equal(await voting.getAccepted(thirdBallotId))
+      expected.third.rejected.should.be.bignumber.equal(await voting.getRejected(thirdBallotId))
+
+      // check 1st and 2nd ballots have been finalized
+      true.should.be.equal(await voting.getIsFinalized(firstBallotId))
+      true.should.be.equal(await voting.getIsFinalized(secondBallotId))
+      false.should.be.equal(await voting.getIsFinalized(thirdBallotId))
+
+      await proxyStorage.upgradeBlockRewardMock(blockRewardImpl.address)
+
+      // vote on 3rd ballot
+      await voting.vote(thirdBallotId, ACTION_CHOICES.ACCEPT, {from: validators[0]}).should.be.rejectedWith(ERROR_MSG)
+      await voting.vote(thirdBallotId, ACTION_CHOICES.ACCEPT, {from: validators[3]}).should.be.fulfilled
+      await voting.vote(thirdBallotId, ACTION_CHOICES.REJECT, {from: validators[4]}).should.be.fulfilled
+
+      // advance until 3rd ballot is closed
+      currentBlock = await voting.getCurrentBlockNumber()
+      voteEndBlock = await voting.getEndBlock(thirdBallotId)
+      await advanceBlocks(voteEndBlock.sub(currentBlock).add(toBN(1)).toNumber())
+      false.should.be.equal(await voting.isActiveBallot(thirdBallotId))
+
+      // end cycle and check votes
+      currentBlock = await voting.getCurrentBlockNumber()
+      currentCycleEndBlock = await consensus.getCurrentCycleEndBlock()
+      await advanceBlocks(currentCycleEndBlock.sub(currentBlock).toNumber())
+      await proxyStorage.setConsensusMock(owner)
+      await voting.onCycleEnd(currentValidators).should.be.fulfilled
+      expected = {
+        first: {
+          accepted: toBN(2).mul(decimals).div(toBN(8)).add(toBN(6).mul(decimals).div(toBN(9))),
+          rejected: toBN(1).mul(decimals).div(toBN(8)).add(toBN(2).mul(decimals).div(toBN(9)))
+        },
+        second: {
+          accepted: toBN(1).mul(decimals).div(toBN(8)).add(toBN(3).mul(decimals).div(toBN(9))),
+          rejected: toBN(2).mul(decimals).div(toBN(8)).add(toBN(3).mul(decimals).div(toBN(9)))
+        },
+        third: {
+          accepted: toBN(3).mul(decimals).div(toBN(9)).add(toBN(4).mul(decimals).div(toBN(9))),
+          rejected: toBN(1).mul(decimals).div(toBN(9)).add(toBN(2).mul(decimals).div(toBN(9)))
+        }
+      }
+      expected.first.accepted.should.be.bignumber.equal(await voting.getAccepted(firstBallotId))
+      expected.first.rejected.should.be.bignumber.equal(await voting.getRejected(firstBallotId))
+      expected.second.accepted.should.be.bignumber.equal(await voting.getAccepted(secondBallotId))
+      expected.second.rejected.should.be.bignumber.equal(await voting.getRejected(secondBallotId))
+      expected.third.accepted.should.be.bignumber.equal(await voting.getAccepted(thirdBallotId))
+      expected.third.rejected.should.be.bignumber.equal(await voting.getRejected(thirdBallotId))
+
+      // check 3rd ballot has been finalized
+      true.should.be.equal(await voting.getIsFinalized(thirdBallotId))
+    })
+    it('golden flow should work wih a lot of validators, a lot of votes', async () => {
+      // TODO
+    })
+  })
+
+  describe('finalize', async () => {
+    let currentValidators
+    beforeEach(async () => {
+      await voting.initialize(MIN_BALLOT_DURATION_CYCLES).should.be.fulfilled
+      voteStartAfterNumberOfCycles = 1
+      voteCyclesDuration = 10
+      currentValidators = await consensus.getValidators()
+    })
+    it('should change to proposed value successfully if quorum is reached', async () => {
+      let id = await voting.getNextBallotId()
+      let proposedValue = RANDOM_ADDRESS
+      let contractType = CONTRACT_TYPES.BLOCK_REWARD
       await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: validators[0]}).should.be.fulfilled
       let currentBlock = await voting.getCurrentBlockNumber()
       let voteStartBlock = await voting.getStartBlock(id)
@@ -298,12 +594,11 @@ contract('Voting', async (accounts) => {
       let voteEndBlock = await voting.getEndBlock(id)
       blocksToAdvance = voteEndBlock.sub(currentBlock)
       await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
-      let {logs} = await voting.finalize(id, {from: validators[0]}).should.be.fulfilled
+      await proxyStorage.setConsensusMock(owner)
+      let {logs} = await voting.onCycleEnd(currentValidators).should.be.fulfilled
       logs.length.should.be.equal(1)
       logs[0].event.should.be.equal('BallotFinalized')
       logs[0].args['id'].should.be.bignumber.equal(id)
-      logs[0].args['finalizer'].should.be.equal(validators[0])
-      toBN(0).should.be.bignumber.equal(await voting.activeBallotsLength())
       let ballotInfo = await voting.getBallotInfo(id, validators[0])
       ballotInfo.startBlock.should.be.bignumber.equal(voteStartBlock)
       ballotInfo.endBlock.should.be.bignumber.equal(voteEndBlock)
@@ -316,13 +611,12 @@ contract('Voting', async (accounts) => {
       ballotInfo.canBeFinalizedNow.should.be.equal(false)
       ballotInfo.alreadyVoted.should.be.equal(true)
       toBN(QUORUM_STATES.ACCEPTED).should.be.bignumber.equal(await voting.getQuorumState(id))
-      toBN(0).should.be.bignumber.equal(await voting.getIndex(id))
-      proposedValue.should.be.equal(await (await EternalStorageProxy.at(await proxyStorage.getConsensus())).getImplementation())
+      proposedValue.should.be.equal(await (await EternalStorageProxy.at(await proxyStorage.getBlockReward())).getImplementation())
     })
     it('should not change to proposed value if quorum is not reached', async () => {
       let id = await voting.getNextBallotId()
       let proposedValue = RANDOM_ADDRESS
-      let contractType = CONTRACT_TYPES.CONSENSUS
+      let contractType = CONTRACT_TYPES.BLOCK_REWARD
       await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: validators[0]}).should.be.fulfilled
       let currentBlock = await voting.getCurrentBlockNumber()
       let voteStartBlock = await voting.getStartBlock(id)
@@ -331,16 +625,14 @@ contract('Voting', async (accounts) => {
       await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: validators[0]}).should.be.fulfilled
       await voting.vote(id, ACTION_CHOICES.REJECT, {from: validators[1]}).should.be.fulfilled
       await voting.vote(id, ACTION_CHOICES.REJECT, {from: validators[2]}).should.be.fulfilled
-      currentBlock = await voting.getCurrentBlockNumber()
       let voteEndBlock = await voting.getEndBlock(id)
       blocksToAdvance = voteEndBlock.sub(currentBlock)
       await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
-      let {logs} = await voting.finalize(id, {from: validators[0]}).should.be.fulfilled
+      await proxyStorage.setConsensusMock(owner)
+      let {logs} = await voting.onCycleEnd(currentValidators).should.be.fulfilled
       logs.length.should.be.equal(1)
       logs[0].event.should.be.equal('BallotFinalized')
       logs[0].args['id'].should.be.bignumber.equal(id)
-      logs[0].args['finalizer'].should.be.equal(validators[0])
-      toBN(0).should.be.bignumber.equal(await voting.activeBallotsLength())
       let ballotInfo = await voting.getBallotInfo(id, validators[0])
       ballotInfo.startBlock.should.be.bignumber.equal(voteStartBlock)
       ballotInfo.endBlock.should.be.bignumber.equal(voteEndBlock)
@@ -353,128 +645,7 @@ contract('Voting', async (accounts) => {
       ballotInfo.canBeFinalizedNow.should.be.equal(false)
       ballotInfo.alreadyVoted.should.be.equal(true)
       toBN(QUORUM_STATES.REJECTED).should.be.bignumber.equal(await voting.getQuorumState(id))
-      toBN(0).should.be.bignumber.equal(await voting.getIndex(id))
-      proposedValue.should.not.be.equal(await (await EternalStorageProxy.at(await proxyStorage.getConsensus())).getImplementation())
-    })
-    it('should fail if trying to finalize twice', async () => {
-      let id = await voting.getNextBallotId()
-      let proposedValue = RANDOM_ADDRESS
-      let contractType = CONTRACT_TYPES.CONSENSUS
-      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: validators[0]}).should.be.fulfilled
-      let currentBlock = await voting.getCurrentBlockNumber()
-      let voteStartBlock = await voting.getStartBlock(id)
-      let blocksToAdvance = voteStartBlock.sub(currentBlock)
-      await advanceBlocks(blocksToAdvance.toNumber())
-      await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: validators[0]}).should.be.fulfilled
-      await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: validators[1]}).should.be.fulfilled
-      await voting.vote(id, ACTION_CHOICES.REJECT, {from: validators[2]}).should.be.fulfilled
-      currentBlock = await voting.getCurrentBlockNumber()
-      let voteEndBlock = await voting.getEndBlock(id)
-      blocksToAdvance = voteEndBlock.sub(currentBlock)
-      await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
-      await voting.finalize(id, {from: validators[0]}).should.be.fulfilled
-      await voting.finalize(id, {from: validators[0]}).should.be.rejectedWith(ERROR_MSG)
-    })
-    it('should be allowed after end time has passed even if not all voters have voted', async () => {
-      let id = await voting.getNextBallotId()
-      let proposedValue = RANDOM_ADDRESS
-      let contractType = CONTRACT_TYPES.CONSENSUS
-      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: validators[0]}).should.be.fulfilled
-      let currentBlock = await voting.getCurrentBlockNumber()
-      let voteEndBlock = await voting.getEndBlock(id)
-      let blocksToAdvance = voteEndBlock.sub(currentBlock)
-      await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
-      await voting.finalize(id, {from: validators[0]}).should.be.fulfilled
-    })
-    it('should fail if not called by valid voting key', async () => {
-      let nonValidatorKey = owner
-      let id = await voting.getNextBallotId()
-      let proposedValue = RANDOM_ADDRESS
-      let contractType = CONTRACT_TYPES.CONSENSUS
-      await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: validators[0]}).should.be.fulfilled
-      let currentBlock = await voting.getCurrentBlockNumber()
-      let voteEndBlock = await voting.getEndBlock(id)
-      let blocksToAdvance = voteEndBlock.sub(currentBlock)
-      await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
-      await voting.finalize(id, {from: nonValidatorKey}).should.be.rejectedWith(ERROR_MSG)
-    })
-    describe('should change all contract types implementations', async () => {
-      it('consensus', async () => {
-        let id = await voting.getNextBallotId()
-        let proposedValue = RANDOM_ADDRESS
-        let contractType = CONTRACT_TYPES.CONSENSUS
-        await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: validators[0]}).should.be.fulfilled
-        let currentBlock = await voting.getCurrentBlockNumber()
-        let voteStartBlock = await voting.getStartBlock(id)
-        let blocksToAdvance = voteStartBlock.sub(currentBlock)
-        await advanceBlocks(blocksToAdvance.toNumber())
-        await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: validators[0]}).should.be.fulfilled
-        await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: validators[1]}).should.be.fulfilled
-        await voting.vote(id, ACTION_CHOICES.REJECT, {from: validators[2]}).should.be.fulfilled
-        currentBlock = await voting.getCurrentBlockNumber()
-        let voteEndBlock = await voting.getEndBlock(id)
-        blocksToAdvance = voteEndBlock.sub(currentBlock)
-        await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
-        await voting.finalize(id, {from: validators[0]}).should.be.fulfilled
-        proposedValue.should.be.equal(await (await EternalStorageProxy.at(await proxyStorage.getConsensus())).getImplementation())
-      })
-      it('block reward', async () => {
-        let id = await voting.getNextBallotId()
-        let proposedValue = RANDOM_ADDRESS
-        let contractType = CONTRACT_TYPES.BLOCK_REWARD
-        await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: validators[0]}).should.be.fulfilled
-        let currentBlock = await voting.getCurrentBlockNumber()
-        let voteStartBlock = await voting.getStartBlock(id)
-        let blocksToAdvance = voteStartBlock.sub(currentBlock)
-        await advanceBlocks(blocksToAdvance.toNumber())
-        await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: validators[0]}).should.be.fulfilled
-        await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: validators[1]}).should.be.fulfilled
-        await voting.vote(id, ACTION_CHOICES.REJECT, {from: validators[2]}).should.be.fulfilled
-        currentBlock = await voting.getCurrentBlockNumber()
-        let voteEndBlock = await voting.getEndBlock(id)
-        blocksToAdvance = voteEndBlock.sub(currentBlock)
-        await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
-        await voting.finalize(id, {from: validators[0]}).should.be.fulfilled
-        proposedValue.should.be.equal(await (await EternalStorageProxy.at(await proxyStorage.getBlockReward())).getImplementation())
-      })
-      it('proxy storage', async () => {
-        let id = await voting.getNextBallotId()
-        let proposedValue = RANDOM_ADDRESS
-        let contractType = CONTRACT_TYPES.PROXY_STORAGE
-        await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: validators[0]}).should.be.fulfilled
-        let currentBlock = await voting.getCurrentBlockNumber()
-        let voteStartBlock = await voting.getStartBlock(id)
-        let blocksToAdvance = voteStartBlock.sub(currentBlock)
-        await advanceBlocks(blocksToAdvance.toNumber())
-        await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: validators[0]}).should.be.fulfilled
-        await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: validators[1]}).should.be.fulfilled
-        await voting.vote(id, ACTION_CHOICES.REJECT, {from: validators[2]}).should.be.fulfilled
-        currentBlock = await voting.getCurrentBlockNumber()
-        let voteEndBlock = await voting.getEndBlock(id)
-        blocksToAdvance = voteEndBlock.sub(currentBlock)
-        await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
-        await voting.finalize(id, {from: validators[0]}).should.be.fulfilled
-        proposedValue.should.be.equal(await (await EternalStorageProxy.at(proxyStorage.address)).getImplementation())
-      })
-      it('voting', async () => {
-        let id = await voting.getNextBallotId()
-        let proposedValue = RANDOM_ADDRESS
-        let contractType = CONTRACT_TYPES.VOTING
-        await voting.newBallot(voteStartAfterNumberOfCycles, voteCyclesDuration, contractType, proposedValue, 'description', {from: validators[0]}).should.be.fulfilled
-        let currentBlock = await voting.getCurrentBlockNumber()
-        let voteStartBlock = await voting.getStartBlock(id)
-        let blocksToAdvance = voteStartBlock.sub(currentBlock)
-        await advanceBlocks(blocksToAdvance.toNumber())
-        await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: validators[0]}).should.be.fulfilled
-        await voting.vote(id, ACTION_CHOICES.ACCEPT, {from: validators[1]}).should.be.fulfilled
-        await voting.vote(id, ACTION_CHOICES.REJECT, {from: validators[2]}).should.be.fulfilled
-        currentBlock = await voting.getCurrentBlockNumber()
-        let voteEndBlock = await voting.getEndBlock(id)
-        blocksToAdvance = voteEndBlock.sub(currentBlock)
-        await advanceBlocks(blocksToAdvance.add(toBN(1)).toNumber())
-        await voting.finalize(id, {from: validators[0]}).should.be.fulfilled
-        proposedValue.should.be.equal(await (await EternalStorageProxy.at(await proxyStorage.getVoting())).getImplementation())
-      })
+      proposedValue.should.not.be.equal(await (await EternalStorageProxy.at(await proxyStorage.getBlockReward())).getImplementation())
     })
   })
 

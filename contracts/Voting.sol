@@ -12,6 +12,8 @@ import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 contract Voting is EternalStorage, VotingBase {
   using SafeMath for uint256;
 
+  uint256 public constant DECIMALS = 10 ** 18;
+
   /**
   * @dev This modifier verifies that msg.sender is the owner of the contract
   */
@@ -36,6 +38,14 @@ contract Voting is EternalStorage, VotingBase {
   */
   modifier onlyValidVotingKey(address _address) {
     require (isValidVotingKey(_address));
+    _;
+  }
+
+  /**
+  * @dev This modifier verifies that msg.sender is the consensus contract
+  */
+  modifier onlyConsensus() {
+    require (msg.sender == ProxyStorage(getProxyStorage()).getConsensus());
     _;
   }
 
@@ -216,12 +226,6 @@ contract Voting is EternalStorage, VotingBase {
     require(isValidChoice(_choice));
     setVoterChoice(_id, voter, _choice);
     setTotalVoters(_id, getTotalVoters(_id).add(1));
-    // TODO this should be removed, count only on cycle end and only current validator votes
-    if (_choice == uint(ActionChoices.Accept)) {
-      setResult(_id, getResult(_id) + 1);
-    } else {
-      setResult(_id, getResult(_id) - 1);
-    }
     emit Vote(_id, _choice, voter);
   }
 
@@ -238,17 +242,46 @@ contract Voting is EternalStorage, VotingBase {
   }
 
   /**
-  * @dev This function is used to finalize an open ballot
-  * @param _id ballot id to be finalized
+  * @dev Function to be called by the consensus contract when a cycles ends
+  * In this function, all active ballots votes will be counted and updated according to the current validators
   */
-  function finalize(uint256 _id) external onlyValidVotingKey(msg.sender) {
-    require(canBeFinalized(_id));
+  function onCycleEnd(address[] validators) public onlyConsensus {
+    uint256 numOfValidators = validators.length;
+    if (numOfValidators == 0) {
+      return;
+    }
+    for (uint i = 0; i < activeBallotsLength(); i++) {
+      uint256 ballotId = activeBallots(i);
+      if (isOpenBallotAndNotFinalized(ballotId)) {
+        uint256 accepts = 0;
+        uint256 rejects = 0;
+        for (uint j = 0; j < numOfValidators; j++) {
+          uint256 choice = getVoterChoice(ballotId, validators[j]);
+          if (choice == uint(ActionChoices.Accept)) {
+            accepts = accepts.add(1);
+          } else if (choice == uint256(ActionChoices.Reject)) {
+            rejects = rejects.add(1);
+          }
+        }
+        accepts = accepts.mul(DECIMALS).div(numOfValidators);
+        rejects = rejects.mul(DECIMALS).div(numOfValidators);
+        setAccepted(ballotId, getAccepted(ballotId).add(accepts));
+        setRejected(ballotId, getRejected(ballotId).add(rejects));
+
+        if (canBeFinalized(ballotId)) {
+          finalize(ballotId);
+        }
+      }
+    }
+  }
+
+  function finalize(uint256 _id) private {
     if (!getFinalizeCalled(_id)) {
       decreaseValidatorLimit(_id);
       setFinalizeCalled(_id);
     }
 
-    if (getResult(_id) > 0) {
+    if (isBallotAccepted(_id)) {
       if (finalizeBallot(_id)) {
         setQuorumState(_id, uint256(QuorumStates.Accepted));
       } else {
@@ -258,9 +291,9 @@ contract Voting is EternalStorage, VotingBase {
       setQuorumState(_id, uint256(QuorumStates.Rejected));
     }
 
-    deactivateBallot(_id);
+    // deactivateBallot(_id); // TODO
     setIsFinalized(_id, true);
-    emit BallotFinalized(_id, msg.sender);
+    emit BallotFinalized(_id);
   }
 
   function deactivateBallot(uint256 _id) private {
@@ -288,6 +321,10 @@ contract Voting is EternalStorage, VotingBase {
 
   function isActiveBallot(uint256 _id) public view returns(bool) {
     return getStartBlock(_id) <= getCurrentBlockNumber() && getCurrentBlockNumber() <= getEndBlock(_id);
+  }
+
+  function isOpenBallotAndNotFinalized(uint256 _id) public view returns(bool) {
+    return getStartBlock(_id) <= getCurrentBlockNumber() && !getFinalizeCalled(_id);
   }
 
   function getQuorumState(uint256 _id) public view returns(uint256) {
@@ -373,20 +410,16 @@ contract Voting is EternalStorage, VotingBase {
     uintStorage[keccak256(abi.encodePacked("votingState", _id, "totalVoters"))] = _value;
   }
 
-  function getResult(uint256 _id) public view returns(int256) {
-    return intStorage[keccak256(abi.encodePacked("votingState", _id, "result"))];
-  }
-
-  function setResult(uint256 _id, int256 _value) private {
-    intStorage[keccak256(abi.encodePacked("votingState", _id, "result"))] = _value;
-  }
-
   function getIndex(uint256 _id) public view returns(uint256) {
     return uintStorage[keccak256(abi.encodePacked("votingState", _id, "index"))];
   }
 
   function setIndex(uint256 _id, uint256 _value) private {
     uintStorage[keccak256(abi.encodePacked("votingState", _id, "index"))] = _value;
+  }
+
+  function activeBallotsAll() public view returns(uint[]) {
+    return uintArrayStorage[keccak256(abi.encodePacked("activeBallots"))];
   }
 
   function activeBallots(uint256 _index) public view returns(uint256) {
@@ -461,5 +494,25 @@ contract Voting is EternalStorage, VotingBase {
 
   function withinLimit(address _key) private view returns(bool) {
     return validatorActiveBallots(_key) < getBallotLimitPerValidator();
+  }
+
+  function getAccepted(uint256 _id) public view returns(uint256) {
+    return uintStorage[keccak256(abi.encodePacked("votingState", _id, "accepted"))];
+  }
+
+  function setAccepted(uint256 _id, uint256 _value) private {
+    uintStorage[keccak256(abi.encodePacked("votingState", _id, "accepted"))] = _value;
+  }
+
+  function getRejected(uint256 _id) public view returns(uint256) {
+    return uintStorage[keccak256(abi.encodePacked("votingState", _id, "rejected"))];
+  }
+
+  function setRejected(uint256 _id, uint256 _value) private {
+    uintStorage[keccak256(abi.encodePacked("votingState", _id, "rejected"))] = _value;
+  }
+
+  function isBallotAccepted(uint256 _id) public view returns(bool) {
+    return getAccepted(_id) > getRejected(_id);
   }
 }

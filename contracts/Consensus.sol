@@ -3,6 +3,7 @@ pragma solidity ^0.4.24;
 import "./abstracts/ValidatorSet.sol";
 import "./eternal-storage/EternalStorage.sol";
 import "./ProxyStorage.sol";
+import "./Voting.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 /**
@@ -48,6 +49,7 @@ contract Consensus is EternalStorage, ValidatorSet {
     require (msg.sender == ProxyStorage(getProxyStorage()).getBlockReward());
     _;
   }
+
   /**
   * @dev Function to be called on contract initialization
   * @param _minStake minimum stake needed to become a validator
@@ -132,6 +134,7 @@ contract Consensus is EternalStorage, ValidatorSet {
   */
   function cycle() public onlyBlockReward {
     if (hasCycleEnded()) {
+      Voting(ProxyStorage(getProxyStorage()).getVoting()).onCycleEnd(currentValidators());
       uint randomSnapshotId = getRandom(0, getSnapshotsPerCycle() - 1);
       setNewValidatorSet(getSnapshot(randomSnapshotId));
       setFinalized(false);
