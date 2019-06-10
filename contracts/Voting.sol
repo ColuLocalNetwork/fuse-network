@@ -252,12 +252,12 @@ contract Voting is EternalStorage, VotingBase, IVoting {
       return;
     }
     uint[] memory ballots = activeBallots();
-    for (uint i = 0; i < ballots.length; i++) {
+    for (uint256 i = 0; i < ballots.length; i++) {
       uint256 ballotId = ballots[i];
       if (isOpenBallotAndNotFinalized(ballotId)) {
         uint256 accepts = 0;
         uint256 rejects = 0;
-        for (uint j = 0; j < numOfValidators; j++) {
+        for (uint256 j = 0; j < numOfValidators; j++) {
           uint256 choice = getVoterChoice(ballotId, validators[j]);
           if (choice == uint(ActionChoices.Accept)) {
             accepts = accepts.add(1);

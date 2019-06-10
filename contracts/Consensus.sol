@@ -136,7 +136,7 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   function cycle() external onlyBlockReward {
     if (hasCycleEnded()) {
       IVoting(ProxyStorage(getProxyStorage()).getVoting()).onCycleEnd(currentValidators());
-      uint randomSnapshotId = getRandom(0, getSnapshotsPerCycle() - 1);
+      uint256 randomSnapshotId = getRandom(0, getSnapshotsPerCycle() - 1);
       setNewValidatorSet(getSnapshot(randomSnapshotId));
       setFinalized(false);
       emit InitiateChange(blockhash(block.number - 1), newValidatorSet());
@@ -148,7 +148,7 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
       } else {
         setNextSnapshotId(0);
       }
-      for (uint i = 0; i < pendingValidatorsLength(); i++) {
+      for (uint256 i = 0; i < pendingValidatorsLength(); i++) {
         addToSnapshot(pendingValidatorsAtPosition(i), snapshotId);
       }
       setLastSnapshotTakenAtBlock(getCurrentBlockNumber());
@@ -379,7 +379,7 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   }
 
   function isValidator(address _address) public view returns(bool) {
-    for (uint i = 0; i < currentValidatorsLength(); i++) {
+    for (uint256 i = 0; i < currentValidatorsLength(); i++) {
       if (_address == currentValidatorsAtPosition(i)) {
         return true;
       }
