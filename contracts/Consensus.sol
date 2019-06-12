@@ -8,26 +8,10 @@ import "./ProxyStorage.sol";
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 /**
-* @title Contract handling PoS consensus logic
+* @title Contract handling consensus logic
 */
 contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   using SafeMath for uint256;
-
-  bytes32 constant OWNER = keccak256(abi.encodePacked("owner"));
-  bytes32 constant SYSTEM_ADDRESS = keccak256(abi.encodePacked("SYSTEM_ADDRESS"));
-  bytes32 constant IS_FINALIZED = keccak256(abi.encodePacked("isFinalized"));
-  bytes32 constant MIN_STAKE = keccak256(abi.encodePacked("minStake"));
-  bytes32 constant CYCLE_DURATION_BLOCKS = keccak256(abi.encodePacked("cycleDurationBlocks"));
-  bytes32 constant CURRENT_CYCLE_START_BLOCK = keccak256(abi.encodePacked("currentCycleStartBlock"));
-  bytes32 constant CURRENT_CYCLE_END_BLOCK = keccak256(abi.encodePacked("currentCycleEndBlock"));
-  bytes32 constant SNAPSHOTS_PER_CYCLE = keccak256(abi.encodePacked("snapshotsPerCycle"));
-  bytes32 constant LAST_SNAPSHOT_TAKEN_AT_BLOCK = keccak256(abi.encodePacked("lastSnapshotTakenAtBlock"));
-  bytes32 constant NEXT_SNAPSHOT_ID = keccak256(abi.encodePacked("nextSnapshotId"));
-  bytes32 constant CURRENT_VALIDATORS = keccak256(abi.encodePacked("currentValidators"));
-  bytes32 constant PENDING_VALIDATORS = keccak256(abi.encodePacked("pendingValidators"));
-  bytes32 constant PROXY_STORAGE = keccak256(abi.encodePacked("proxyStorage"));
-  bytes32 constant WAS_PROXY_STORAGE_SET = keccak256(abi.encodePacked("wasProxyStorageSet"));
-  bytes32 constant NEW_VALIDATOR_SET = keccak256(abi.encodePacked("newValidatorSet"));
 
   /**
   * @dev This event will be emitted after a change to the validator set has been finalized
@@ -172,6 +156,22 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
       delete snapshotId;
     }
   }
+
+  bytes32 internal constant OWNER = keccak256(abi.encodePacked("owner"));
+  bytes32 internal constant SYSTEM_ADDRESS = keccak256(abi.encodePacked("SYSTEM_ADDRESS"));
+  bytes32 internal constant IS_FINALIZED = keccak256(abi.encodePacked("isFinalized"));
+  bytes32 internal constant MIN_STAKE = keccak256(abi.encodePacked("minStake"));
+  bytes32 internal constant CYCLE_DURATION_BLOCKS = keccak256(abi.encodePacked("cycleDurationBlocks"));
+  bytes32 internal constant CURRENT_CYCLE_START_BLOCK = keccak256(abi.encodePacked("currentCycleStartBlock"));
+  bytes32 internal constant CURRENT_CYCLE_END_BLOCK = keccak256(abi.encodePacked("currentCycleEndBlock"));
+  bytes32 internal constant SNAPSHOTS_PER_CYCLE = keccak256(abi.encodePacked("snapshotsPerCycle"));
+  bytes32 internal constant LAST_SNAPSHOT_TAKEN_AT_BLOCK = keccak256(abi.encodePacked("lastSnapshotTakenAtBlock"));
+  bytes32 internal constant NEXT_SNAPSHOT_ID = keccak256(abi.encodePacked("nextSnapshotId"));
+  bytes32 internal constant CURRENT_VALIDATORS = keccak256(abi.encodePacked("currentValidators"));
+  bytes32 internal constant PENDING_VALIDATORS = keccak256(abi.encodePacked("pendingValidators"));
+  bytes32 internal constant PROXY_STORAGE = keccak256(abi.encodePacked("proxyStorage"));
+  bytes32 internal constant WAS_PROXY_STORAGE_SET = keccak256(abi.encodePacked("wasProxyStorageSet"));
+  bytes32 internal constant NEW_VALIDATOR_SET = keccak256(abi.encodePacked("newValidatorSet"));
 
   function _stake(address _staker, uint256 _amount) private {
     require(_staker != address(0));
