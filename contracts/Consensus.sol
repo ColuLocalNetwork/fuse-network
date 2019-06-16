@@ -108,6 +108,13 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   }
 
   /**
+  * @dev stake to become a validator.
+  */
+  function stake() external payable {
+    _stake(msg.sender, msg.value);
+  }
+
+  /**
   * @dev Function to be called when a staker whishes to withdraw some of his staked funds
   * @param _amount the amount msg.sender wishes to withdraw from the contract
   */
