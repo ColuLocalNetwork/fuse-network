@@ -115,6 +115,14 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   }
 
   /**
+  * @dev delegate to a validator
+  * @param _validator the address of the validator msg.sender is delegating to
+  */
+  function delegate(address _validator) external payable {
+    _delegate(msg.sender, msg.value, _validator);
+  }
+
+  /**
   * @dev Function to be called when a staker whishes to withdraw some of his staked funds
   * @param _amount the amount msg.sender wishes to withdraw from the contract
   */
@@ -123,8 +131,27 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
     require (_amount <= stakeAmount(msg.sender));
 
     stakeAmountSub(msg.sender, _amount);
-
     _removeValidator(msg.sender);
+
+    msg.sender.transfer(_amount);
+  }
+
+  /**
+  * @dev Function to be called when a delegator whishes to withdraw some of his staked funds for a validator
+  * @param _validator the address of the validator msg.sender has delegating to
+  * @param _amount the amount msg.sender wishes to withdraw from the contract
+  */
+  function withdraw(address _validator, uint256 _amount) external {
+    require (_validator != address(0));
+    require (_amount > 0);
+
+    require (_amount <= stakeAmount(_validator));
+    require (_amount <= delegatedAmount(msg.sender, _validator));
+
+    delegatedAmountSub(msg.sender, _validator, _amount);
+
+    stakeAmountSub(_validator, _amount);
+    _removeValidator(_validator);
 
     msg.sender.transfer(_amount);
   }
@@ -188,6 +215,19 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
 
     if (stakeAmount(_staker) >= getMinStake()) {
       _addValidator(_staker);
+    }
+  }
+
+  function _delegate(address _staker, uint256 _amount, address _validator) private {
+    require(_staker != address(0));
+    require(_amount != 0);
+    require(_validator != address(0));
+
+    delegatedAmountAdd(_staker, _validator, _amount);
+    stakeAmountAdd(_validator, _amount);
+
+    if (stakeAmount(_validator) >= getMinStake()) {
+      _addValidator(_validator);
     }
   }
 
@@ -395,8 +435,16 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
     uintStorage[keccak256(abi.encodePacked("stakeAmount", _address))] = uintStorage[keccak256(abi.encodePacked("stakeAmount", _address))].sub(_amount);
   }
 
-  function setStakeAmount(address _address, uint256 _amount) private {
-    uintStorage[keccak256(abi.encodePacked("stakeAmount", _address))] = _amount;
+  function delegatedAmount(address _address, address _validator) public view returns(uint256) {
+    return uintStorage[keccak256(abi.encodePacked("delegatedAmount", _address, _validator))];
+  }
+
+  function delegatedAmountAdd(address _address, address _validator, uint256 _amount) private {
+    uintStorage[keccak256(abi.encodePacked("delegatedAmount", _address, _validator))] = uintStorage[keccak256(abi.encodePacked("delegatedAmount", _address, _validator))].add(_amount);
+  }
+
+  function delegatedAmountSub(address _address, address _validator, uint256 _amount) private {
+    uintStorage[keccak256(abi.encodePacked("delegatedAmount", _address, _validator))] = uintStorage[keccak256(abi.encodePacked("delegatedAmount", _address, _validator))].sub(_amount);
   }
 
   function isValidator(address _address) public view returns(bool) {
