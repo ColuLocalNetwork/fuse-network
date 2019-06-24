@@ -23,7 +23,7 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   * @dev This modifier verifies that the change initiated has not been finalized yet
   */
   modifier notFinalized() {
-    require (!isFinalized());
+    require(!isFinalized());
     _;
   }
 
@@ -47,7 +47,7 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   * @dev This modifier verifies that msg.sender is the block reward contract
   */
   modifier onlyBlockReward() {
-    require (msg.sender == ProxyStorage(getProxyStorage()).getBlockReward());
+    require(msg.sender == ProxyStorage(getProxyStorage()).getBlockReward());
     _;
   }
 
@@ -126,8 +126,8 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   * @param _amount the amount msg.sender wishes to withdraw from the contract
   */
   function withdraw(uint256 _amount) external {
-    require (_amount > 0);
-    require (_amount <= stakeAmount(msg.sender));
+    require(_amount > 0);
+    require(_amount <= stakeAmount(msg.sender));
 
     _stakeAmountSub(msg.sender, _amount);
     _removeValidator(msg.sender);
@@ -141,11 +141,11 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   * @param _amount the amount msg.sender wishes to withdraw from the contract
   */
   function withdraw(address _validator, uint256 _amount) external {
-    require (_validator != address(0));
-    require (_amount > 0);
+    require(_validator != address(0));
+    require(_amount > 0);
 
-    require (_amount <= stakeAmount(_validator));
-    require (_amount <= delegatedAmount(msg.sender, _validator));
+    require(_amount <= stakeAmount(_validator));
+    require(_amount <= delegatedAmount(msg.sender, _validator));
 
     _delegatedAmountSub(msg.sender, _validator, _amount);
 
@@ -248,7 +248,7 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   }
 
   function _removeValidator(address _validator) private {
-    require (_validator != address(0));
+    require(_validator != address(0));
 
     uint256 stakeMultiplier = stakeAmount(_validator).div(getMinStake());
     uint256 currentAppearances = validatorIndexesLength(_validator);

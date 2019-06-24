@@ -28,7 +28,7 @@ contract Voting is EternalStorage, VotingBase, IVoting {
   */
   modifier onlyValidDuration(uint256 _startAfterNumberOfCycles, uint256 _cyclesDuration) {
     require(_startAfterNumberOfCycles > 0);
-    require (_cyclesDuration > 0);
+    require(_cyclesDuration > 0);
     require(_cyclesDuration >= getMinBallotDurationCycles());
     require(_cyclesDuration <= getMaxBallotDurationCycles());
     _;
@@ -38,7 +38,7 @@ contract Voting is EternalStorage, VotingBase, IVoting {
   * @dev This modifier verifies an address is valid for voting
   */
   modifier onlyValidVotingKey(address _address) {
-    require (isValidVotingKey(_address));
+    require(isValidVotingKey(_address));
     _;
   }
 
@@ -46,7 +46,7 @@ contract Voting is EternalStorage, VotingBase, IVoting {
   * @dev This modifier verifies that msg.sender is the consensus contract
   */
   modifier onlyConsensus() {
-    require (msg.sender == ProxyStorage(getProxyStorage()).getConsensus());
+    require(msg.sender == ProxyStorage(getProxyStorage()).getConsensus());
     _;
   }
 
