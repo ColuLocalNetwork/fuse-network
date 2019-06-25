@@ -116,6 +116,36 @@ contract('Consensus', async (accounts) => {
     })
   })
 
+  describe('emitInitiateChange', async () => {
+    beforeEach(async () => {
+      await consensus.initialize(MIN_STAKE, CYCLE_DURATION_BLOCKS, SNAPSHOTS_PER_CYCLE, initialValidator)
+      await consensus.setProxyStorage(proxyStorage.address)
+      await consensus.setFinalizedMock(false, {from: owner})
+    })
+    it('should fail if not called by validator', async () => {
+      await consensus.emitInitiateChange({from: nonOwner}).should.be.rejectedWith(ERROR_MSG)
+    })
+    it('should fail if newValidatorSet is empty', async () => {
+      await consensus.setShouldEmitInitiateChangeMock(true)
+      await consensus.emitInitiateChange({from: initialValidator}).should.be.rejectedWith(ERROR_MSG)
+    })
+    it('should fail if `shouldEmitInitiateChange` is false', async () => {
+      let mockSet = [firstCandidate, secondCandidate]
+      await consensus.setNewValidatorSetMock(mockSet)
+      await consensus.emitInitiateChange({from: initialValidator}).should.be.rejectedWith(ERROR_MSG)
+    })
+    it('should be successful and emit event', async () => {
+      await consensus.setShouldEmitInitiateChangeMock(true)
+      let mockSet = [firstCandidate, secondCandidate]
+      await consensus.setNewValidatorSetMock(mockSet)
+      let {logs} = await consensus.emitInitiateChange({from: initialValidator}).should.be.fulfilled
+      false.should.be.equal(await consensus.shouldEmitInitiateChange())
+      logs.length.should.be.equal(1)
+      logs[0].event.should.be.equal('InitiateChange')
+      logs[0].args['newSet'].should.deep.equal(mockSet)
+    })
+  })
+
   describe('finalizeChange', async () => {
     beforeEach(async () => {
       await consensus.initialize(MIN_STAKE, CYCLE_DURATION_BLOCKS, SNAPSHOTS_PER_CYCLE, initialValidator)
@@ -690,9 +720,10 @@ contract('Consensus', async (accounts) => {
 
       // call cycle function
       tx = await consensus.cycle({from: owner}).should.be.fulfilled
+      true.should.be.equal(await consensus.shouldEmitInitiateChange())
       tx.logs.length.should.be.equal(1)
-      tx.logs[0].event.should.be.equal('InitiateChange')
-      tx.logs[0].args['newSet'].should.deep.equal(randomSnapshot)
+      tx.logs[0].event.should.be.equal('ShouldEmitInitiateChange')
+      randomSnapshot.should.be.deep.equal(await consensus.newValidatorSet())
 
       // call finalizeChange
       tx = await consensus.finalizeChange().should.be.fulfilled
@@ -739,9 +770,10 @@ contract('Consensus', async (accounts) => {
 
       // call cycle function
       tx = await consensus.cycle({from: owner}).should.be.fulfilled
+      true.should.be.equal(await consensus.shouldEmitInitiateChange())
       tx.logs.length.should.be.equal(1)
-      tx.logs[0].event.should.be.equal('InitiateChange')
-      tx.logs[0].args['newSet'].should.deep.equal(randomSnapshot)
+      tx.logs[0].event.should.be.equal('ShouldEmitInitiateChange')
+      randomSnapshot.should.be.deep.equal(await consensus.newValidatorSet())
 
       // call finalizeChange
       tx = await consensus.finalizeChange().should.be.fulfilled

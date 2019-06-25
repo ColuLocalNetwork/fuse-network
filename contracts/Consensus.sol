@@ -20,6 +20,11 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   event ChangeFinalized(address[] newSet);
 
   /**
+  * @dev This event will be emitted on cycle end to indicate the `emitInitiateChange` function needs to be called to apply a new validator set
+  */
+  event ShouldEmitInitiateChange();
+
+  /**
   * @dev This modifier verifies that the change initiated has not been finalized yet
   */
   modifier notFinalized() {
@@ -48,6 +53,14 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   */
   modifier onlyBlockReward() {
     require(msg.sender == ProxyStorage(getProxyStorage()).getBlockReward());
+    _;
+  }
+
+  /**
+  * @dev This modifier verifies that msg.sender is a validator
+  */
+  modifier onlyValidator() {
+    require(isValidator(msg.sender));
     _;
   }
 
@@ -184,10 +197,22 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
       _setNewValidatorSet(getSnapshot(randomSnapshotId));
       if (newValidatorSetLength() > 0) {
         _setFinalized(false);
-        emit InitiateChange(blockhash(block.number - 1), newValidatorSet());
+        _setShouldEmitInitiateChange(true);
+        emit ShouldEmitInitiateChange();
       }
       delete randomSnapshotId;
     }
+  }
+
+  /**
+  * @dev Function to be called by validators to emit InitiateChange event (only if `shouldEmitInitiateChange` returns true)
+  */
+  function emitInitiateChange() external onlyValidator {
+    require(shouldEmitInitiateChange());
+    require(newValidatorSetLength() > 0);
+
+    emit InitiateChange(blockhash(block.number - 1), newValidatorSet());
+    _setShouldEmitInitiateChange(false);
   }
 
   bytes32 internal constant OWNER = keccak256(abi.encodePacked("owner"));
@@ -205,6 +230,7 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
   bytes32 internal constant PROXY_STORAGE = keccak256(abi.encodePacked("proxyStorage"));
   bytes32 internal constant WAS_PROXY_STORAGE_SET = keccak256(abi.encodePacked("wasProxyStorageSet"));
   bytes32 internal constant NEW_VALIDATOR_SET = keccak256(abi.encodePacked("newValidatorSet"));
+  bytes32 internal constant SHOULD_EMIT_INITIATE_CHANGE = keccak256(abi.encodePacked("shouldEmitInitiateChange"));
 
   function _stake(address _staker, uint256 _amount) private {
     require(_staker != address(0));
@@ -497,5 +523,13 @@ contract Consensus is EternalStorage, ValidatorSet, IConsensus {
 
   function _setNewValidatorSet(address[] _newSet) private {
     addressArrayStorage[NEW_VALIDATOR_SET] = _newSet;
+  }
+
+  function shouldEmitInitiateChange() public view returns(bool) {
+    return boolStorage[SHOULD_EMIT_INITIATE_CHANGE];
+  }
+
+  function _setShouldEmitInitiateChange(bool _status) private {
+    boolStorage[SHOULD_EMIT_INITIATE_CHANGE] = _status;
   }
 }

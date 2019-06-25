@@ -22,4 +22,8 @@ contract ConsensusMock is Consensus {
   function setFinalizedMock(bool _status) public {
     boolStorage[IS_FINALIZED] = _status;
   }
+
+  function setShouldEmitInitiateChangeMock(bool _status) public {
+    boolStorage[SHOULD_EMIT_INITIATE_CHANGE] = _status;
+  }
 }
