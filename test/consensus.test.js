@@ -16,7 +16,7 @@ const MULTIPLE_MIN_STAKE = toWei(toBN(MIN_STAKE_AMOUNT * MULTIPLY_AMOUNT), 'ethe
 const CYCLE_DURATION_BLOCKS = 100
 const SNAPSHOTS_PER_CYCLE = 10
 
-contract.skip('Consensus', async (accounts) => {
+contract('Consensus', async (accounts) => {
   let consensusImpl, proxy, consensus
   let owner = accounts[0]
   let nonOwner = accounts[1]
@@ -73,7 +73,7 @@ contract.skip('Consensus', async (accounts) => {
       let validators = await consensus.getValidators()
       validators.length.should.be.equal(1)
       validators[0].should.be.equal(initialValidator)
-      let pendingValidators = await consensus.getPendingValidators()
+      let pendingValidators = await consensus.pendingValidators()
       pendingValidators.length.should.be.equal(0)
     })
     it('initial validator address not defined - owner should be initial validator', async () => {
@@ -203,7 +203,7 @@ contract.skip('Consensus', async (accounts) => {
         // sender stake amount should be updated
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
         // pending validators should not be updated
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(0)
       })
       it('more than minimum stake', async () => {
@@ -213,7 +213,7 @@ contract.skip('Consensus', async (accounts) => {
         // sender stake amount should be updated
         MORE_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
         // pending validators should be updated
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
         pendingValidators[0].should.be.equal(firstCandidate)
       })
@@ -224,40 +224,37 @@ contract.skip('Consensus', async (accounts) => {
         await consensus.sendTransaction({from: firstCandidate, value: LESS_THAN_MIN_STAKE}).should.be.fulfilled
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(0)
 
         // 2nd stake
         await consensus.sendTransaction({from: firstCandidate, value: ONE_ETHER}).should.be.fulfilled
         MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
         pendingValidators[0].should.be.equal(firstCandidate)
       })
       it('more than one validator', async () => {
         // add 1st validator
         await consensus.sendTransaction({from: firstCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
         // add 2nd validator
         await consensus.sendTransaction({from: secondCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(2)
       })
       it('multiple times according to staked amount', async () => {
-        let expectedValidators = []
-        for (let i = 0; i < MULTIPLY_AMOUNT; i++) {
-          expectedValidators.push(firstCandidate)
-        }
+        let expectedValidators = [firstCandidate]
         await consensus.sendTransaction({from: firstCandidate, value: MULTIPLE_MIN_STAKE}).should.be.fulfilled
         // contract balance should be updated
         MULTIPLE_MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         // sender stake amount should be updated
         MULTIPLE_MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
         // pending validators should be updated
-        let pendingValidators = await consensus.getPendingValidators()
-        pendingValidators.length.should.be.equal(MULTIPLY_AMOUNT)
+        let pendingValidators = await consensus.pendingValidators()
+        pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal(expectedValidators)
       })
       it('multiple times according to staked amount, in more than one transaction', async () => {
@@ -265,7 +262,7 @@ contract.skip('Consensus', async (accounts) => {
         await consensus.sendTransaction({from: firstCandidate, value: LESS_THAN_MIN_STAKE}).should.be.fulfilled
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(0)
 
         // 2nd stake - added once
@@ -273,20 +270,17 @@ contract.skip('Consensus', async (accounts) => {
         await consensus.sendTransaction({from: firstCandidate, value: ONE_ETHER}).should.be.fulfilled
         MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
-        pendingValidators[0].should.be.equal(firstCandidate)
+        pendingValidators.should.deep.equal(expectedValidators)
 
         // 3rd stake - added MULTIPLY_AMOUNT more times
-        for (let i = 0; i < MULTIPLY_AMOUNT; i++) {
-          expectedValidators.push(firstCandidate)
-        }
         await consensus.sendTransaction({from: firstCandidate, value: MULTIPLE_MIN_STAKE}).should.be.fulfilled
         let amount = toWei(toBN(MIN_STAKE_AMOUNT * (1 + MULTIPLY_AMOUNT)), 'ether')
         amount.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         amount.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
-        pendingValidators = await consensus.getPendingValidators()
-        pendingValidators.length.should.be.equal(1 + MULTIPLY_AMOUNT)
+        pendingValidators = await consensus.pendingValidators()
+        pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal(expectedValidators)
       })
       it('multiple validators, multiple times', async () => {
@@ -294,27 +288,23 @@ contract.skip('Consensus', async (accounts) => {
         // add 1st validator
         expectedValidators.push(firstCandidate)
         await consensus.sendTransaction({from: firstCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(expectedValidators.length)
         pendingValidators.should.deep.equal(expectedValidators)
         // add 2nd validator
         expectedValidators.push(secondCandidate)
         await consensus.sendTransaction({from: secondCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(expectedValidators.length)
         pendingValidators.should.deep.equal(expectedValidators)
         // add 1st validator MULTIPLY_AMOUNT more times
-        for (let i = 0; i < MULTIPLY_AMOUNT; i++) {
-          expectedValidators.push(firstCandidate)
-        }
         await consensus.sendTransaction({from: firstCandidate, value: MULTIPLE_MIN_STAKE}).should.be.fulfilled
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(expectedValidators.length)
         pendingValidators.should.deep.equal(expectedValidators)
         // add 2nd validator one more time
-        expectedValidators.push(secondCandidate)
         await consensus.sendTransaction({from: secondCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(expectedValidators.length)
         pendingValidators.should.deep.equal(expectedValidators)
       })
@@ -337,7 +327,7 @@ contract.skip('Consensus', async (accounts) => {
         // sender stake amount should be updated
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
         // pending validators should not be updated
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(0)
       })
       it('more than minimum stake', async () => {
@@ -347,7 +337,7 @@ contract.skip('Consensus', async (accounts) => {
         // sender stake amount should be updated
         MORE_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
         // pending validators should be updated
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
         pendingValidators[0].should.be.equal(firstCandidate)
       })
@@ -358,40 +348,37 @@ contract.skip('Consensus', async (accounts) => {
         await consensus.stake({from: firstCandidate, value: LESS_THAN_MIN_STAKE}).should.be.fulfilled
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(0)
 
         // 2nd stake
         await consensus.stake({from: firstCandidate, value: ONE_ETHER}).should.be.fulfilled
         MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
         pendingValidators[0].should.be.equal(firstCandidate)
       })
       it('more than one validator', async () => {
         // add 1st validator
         await consensus.stake({from: firstCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
         // add 2nd validator
         await consensus.stake({from: secondCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(2)
       })
       it('multiple times according to staked amount', async () => {
-        let expectedValidators = []
-        for (let i = 0; i < MULTIPLY_AMOUNT; i++) {
-          expectedValidators.push(firstCandidate)
-        }
+        let expectedValidators = [firstCandidate]
         await consensus.stake({from: firstCandidate, value: MULTIPLE_MIN_STAKE}).should.be.fulfilled
         // contract balance should be updated
         MULTIPLE_MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         // sender stake amount should be updated
         MULTIPLE_MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
         // pending validators should be updated
-        let pendingValidators = await consensus.getPendingValidators()
-        pendingValidators.length.should.be.equal(MULTIPLY_AMOUNT)
+        let pendingValidators = await consensus.pendingValidators()
+        pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal(expectedValidators)
       })
       it('multiple times according to staked amount, in more than one transaction', async () => {
@@ -399,7 +386,7 @@ contract.skip('Consensus', async (accounts) => {
         await consensus.stake({from: firstCandidate, value: LESS_THAN_MIN_STAKE}).should.be.fulfilled
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(0)
 
         // 2nd stake - added once
@@ -407,20 +394,17 @@ contract.skip('Consensus', async (accounts) => {
         await consensus.stake({from: firstCandidate, value: ONE_ETHER}).should.be.fulfilled
         MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
         pendingValidators[0].should.be.equal(firstCandidate)
 
         // 3rd stake - added MULTIPLY_AMOUNT more times
-        for (let i = 0; i < MULTIPLY_AMOUNT; i++) {
-          expectedValidators.push(firstCandidate)
-        }
         await consensus.stake({from: firstCandidate, value: MULTIPLE_MIN_STAKE}).should.be.fulfilled
         let amount = toWei(toBN(MIN_STAKE_AMOUNT * (1 + MULTIPLY_AMOUNT)), 'ether')
         amount.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         amount.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
-        pendingValidators = await consensus.getPendingValidators()
-        pendingValidators.length.should.be.equal(1 + MULTIPLY_AMOUNT)
+        pendingValidators = await consensus.pendingValidators()
+        pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal(expectedValidators)
       })
       it('multiple validators, multiple times', async () => {
@@ -428,27 +412,23 @@ contract.skip('Consensus', async (accounts) => {
         // add 1st validator
         expectedValidators.push(firstCandidate)
         await consensus.stake({from: firstCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(expectedValidators.length)
         pendingValidators.should.deep.equal(expectedValidators)
         // add 2nd validator
         expectedValidators.push(secondCandidate)
         await consensus.stake({from: secondCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(expectedValidators.length)
         pendingValidators.should.deep.equal(expectedValidators)
         // add 1st validator MULTIPLY_AMOUNT more times
-        for (let i = 0; i < MULTIPLY_AMOUNT; i++) {
-          expectedValidators.push(firstCandidate)
-        }
         await consensus.stake({from: firstCandidate, value: MULTIPLE_MIN_STAKE}).should.be.fulfilled
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(expectedValidators.length)
         pendingValidators.should.deep.equal(expectedValidators)
         // add 2nd validator one more time
-        expectedValidators.push(secondCandidate)
         await consensus.stake({from: secondCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(expectedValidators.length)
         pendingValidators.should.deep.equal(expectedValidators)
       })
@@ -476,7 +456,7 @@ contract.skip('Consensus', async (accounts) => {
         // delegated amount should be updated
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.delegatedAmount(delegator, firstCandidate))
         // pending validators should not be updated
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(0)
       })
       it('more than minimum stake', async () => {
@@ -488,7 +468,7 @@ contract.skip('Consensus', async (accounts) => {
         // delegated amount should be updated
         MORE_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.delegatedAmount(delegator, firstCandidate))
         // pending validators should be updated
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
         pendingValidators[0].should.be.equal(firstCandidate)
       })
@@ -500,7 +480,7 @@ contract.skip('Consensus', async (accounts) => {
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.delegatedAmount(delegator, firstCandidate))
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(0)
 
         // 2nd stake
@@ -508,25 +488,22 @@ contract.skip('Consensus', async (accounts) => {
         MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
         MIN_STAKE.should.be.bignumber.equal(await consensus.delegatedAmount(delegator, firstCandidate))
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
         pendingValidators[0].should.be.equal(firstCandidate)
       })
       it('more than one validator', async () => {
         // add 1st validator
         await consensus.delegate(firstCandidate, {from: delegator, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
         // add 2nd validator
         await consensus.delegate(secondCandidate, {from: delegator, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(2)
       })
       it('multiple times according to staked amount', async () => {
-        let expectedValidators = []
-        for (let i = 0; i < MULTIPLY_AMOUNT; i++) {
-          expectedValidators.push(firstCandidate)
-        }
+        let expectedValidators = [firstCandidate]
         await consensus.delegate(firstCandidate, {from: delegator, value: MULTIPLE_MIN_STAKE}).should.be.fulfilled
         // contract balance should be updated
         MULTIPLE_MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
@@ -535,8 +512,8 @@ contract.skip('Consensus', async (accounts) => {
         // delegated amount should be updated
         MULTIPLE_MIN_STAKE.should.be.bignumber.equal(await consensus.delegatedAmount(delegator, firstCandidate))
         // pending validators should be updated
-        let pendingValidators = await consensus.getPendingValidators()
-        pendingValidators.length.should.be.equal(MULTIPLY_AMOUNT)
+        let pendingValidators = await consensus.pendingValidators()
+        pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal(expectedValidators)
       })
       it('multiple times according to staked amount, in more than one transaction', async () => {
@@ -545,7 +522,7 @@ contract.skip('Consensus', async (accounts) => {
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
         LESS_THAN_MIN_STAKE.should.be.bignumber.equal(await consensus.delegatedAmount(delegator, firstCandidate))
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(0)
 
         // 2nd stake - added once
@@ -554,21 +531,17 @@ contract.skip('Consensus', async (accounts) => {
         MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         MIN_STAKE.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
         MIN_STAKE.should.be.bignumber.equal(await consensus.delegatedAmount(delegator, firstCandidate))
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
         pendingValidators[0].should.be.equal(firstCandidate)
 
-        // 3rd stake - added MULTIPLY_AMOUNT more times
-        for (let i = 0; i < MULTIPLY_AMOUNT; i++) {
-          expectedValidators.push(firstCandidate)
-        }
         await consensus.delegate(firstCandidate, {from: delegator, value: MULTIPLE_MIN_STAKE}).should.be.fulfilled
         let amount = toWei(toBN(MIN_STAKE_AMOUNT * (1 + MULTIPLY_AMOUNT)), 'ether')
         amount.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         amount.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
         amount.should.be.bignumber.equal(await consensus.delegatedAmount(delegator, firstCandidate))
-        pendingValidators = await consensus.getPendingValidators()
-        pendingValidators.length.should.be.equal(1 + MULTIPLY_AMOUNT)
+        pendingValidators = await consensus.pendingValidators()
+        pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal(expectedValidators)
       })
       it('multiple validators, multiple times', async () => {
@@ -576,27 +549,23 @@ contract.skip('Consensus', async (accounts) => {
         // add 1st validator
         expectedValidators.push(firstCandidate)
         await consensus.delegate(firstCandidate, {from: delegator, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(expectedValidators.length)
         pendingValidators.should.deep.equal(expectedValidators)
         // add 2nd validator
         expectedValidators.push(secondCandidate)
         await consensus.delegate(secondCandidate, {from: delegator, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(expectedValidators.length)
         pendingValidators.should.deep.equal(expectedValidators)
         // add 1st validator MULTIPLY_AMOUNT more times
-        for (let i = 0; i < MULTIPLY_AMOUNT; i++) {
-          expectedValidators.push(firstCandidate)
-        }
         await consensus.delegate(firstCandidate, {from: delegator, value: MULTIPLE_MIN_STAKE}).should.be.fulfilled
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(expectedValidators.length)
         pendingValidators.should.deep.equal(expectedValidators)
         // add 2nd validator one more time
-        expectedValidators.push(secondCandidate)
         await consensus.delegate(secondCandidate, {from: delegator, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-        pendingValidators = await consensus.getPendingValidators()
+        pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(expectedValidators.length)
         pendingValidators.should.deep.equal(expectedValidators)
       })
@@ -663,13 +632,13 @@ contract.skip('Consensus', async (accounts) => {
       currentValidators.length.should.be.equal(1)
       currentValidators[0].should.be.equal(initialValidator)
       // console.log('currentValidators', currentValidators)
-      pendingValidators = await consensus.getPendingValidators()
+      pendingValidators = await consensus.pendingValidators()
       pendingValidators.length.should.be.equal(0)
       // console.log('pendingValidators', pendingValidators)
 
       // 1st staker added to pending validators
       await consensus.sendTransaction({from: firstCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-      pendingValidators = await consensus.getPendingValidators()
+      pendingValidators = await consensus.pendingValidators()
       pendingValidators.length.should.be.equal(1)
       pendingValidators.should.deep.equal([firstCandidate])
       // console.log('pendingValidators', pendingValidators)
@@ -690,7 +659,7 @@ contract.skip('Consensus', async (accounts) => {
 
       // 2nd staker added to pending validators
       await consensus.sendTransaction({from: secondCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-      pendingValidators = await consensus.getPendingValidators()
+      pendingValidators = await consensus.pendingValidators()
       pendingValidators.length.should.be.equal(2)
       pendingValidators.should.deep.equal([firstCandidate, secondCandidate])
       // console.log('pendingValidators', pendingValidators)
@@ -736,7 +705,7 @@ contract.skip('Consensus', async (accounts) => {
 
       // 3rd staker added to pending validators
       await consensus.sendTransaction({from: thirdCandidate, value: MORE_THAN_MIN_STAKE}).should.be.fulfilled
-      pendingValidators = await consensus.getPendingValidators()
+      pendingValidators = await consensus.pendingValidators()
       pendingValidators.length.should.be.equal(3)
       pendingValidators.should.deep.equal([firstCandidate, secondCandidate, thirdCandidate])
       // console.log('pendingValidators', pendingValidators)
@@ -809,7 +778,7 @@ contract.skip('Consensus', async (accounts) => {
         MIN_STAKE.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
         ZERO_AMOUNT.should.be.bignumber.equal(await consensus.stakeAmount(firstCandidate))
         // pendingValidators should be updated
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal([secondCandidate])
       })
@@ -819,14 +788,11 @@ contract.skip('Consensus', async (accounts) => {
         // withdraw
         await consensus.methods['withdraw(uint256)'](MIN_STAKE, {from: firstCandidate})
         let expectedAmount = toWei(toBN(MIN_STAKE_AMOUNT * (MULTIPLY_AMOUNT - 1)), 'ether')
-        let expectedValidators = []
+        let expectedValidators = [firstCandidate]
         expectedAmount.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
-        for (let i = 0; i < MULTIPLY_AMOUNT - 1; i++) {
-          expectedValidators.push(firstCandidate)
-        }
         // pendingValidators should be updated
-        let pendingValidators = await consensus.getPendingValidators()
-        pendingValidators.length.should.be.equal(MULTIPLY_AMOUNT - 1)
+        let pendingValidators = await consensus.pendingValidators()
+        pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal(expectedValidators)
       })
       it('can withdraw multiple times', async () => {
@@ -835,24 +801,17 @@ contract.skip('Consensus', async (accounts) => {
         // withdraw 1st time
         await consensus.methods['withdraw(uint256)'](MIN_STAKE, {from: firstCandidate})
         let expectedAmount = toWei(toBN(MIN_STAKE_AMOUNT * (MULTIPLY_AMOUNT - 1)), 'ether')
-        let expectedValidators = []
+        let expectedValidators = [firstCandidate]
         expectedAmount.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
-        for (let i = 0; i < MULTIPLY_AMOUNT - 1; i++) {
-          expectedValidators.push(firstCandidate)
-        }
-        let pendingValidators = await consensus.getPendingValidators()
-        pendingValidators.length.should.be.equal(MULTIPLY_AMOUNT - 1)
+        let pendingValidators = await consensus.pendingValidators()
+        pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal(expectedValidators)
         // withdraw 2nd time
         await consensus.withdraw(MIN_STAKE, {from: firstCandidate})
         expectedAmount = toWei(toBN(MIN_STAKE_AMOUNT * (MULTIPLY_AMOUNT - 2)), 'ether')
-        expectedValidators = []
         expectedAmount.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
-        for (let i = 0; i < MULTIPLY_AMOUNT - 2; i++) {
-          expectedValidators.push(firstCandidate)
-        }
-        pendingValidators = await consensus.getPendingValidators()
-        pendingValidators.length.should.be.equal(MULTIPLY_AMOUNT - 2)
+        pendingValidators = await consensus.pendingValidators()
+        pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal(expectedValidators)
       })
     })
@@ -880,7 +839,7 @@ contract.skip('Consensus', async (accounts) => {
         ZERO_AMOUNT.should.be.bignumber.equal(await consensus.delegatedAmount(delegator, firstCandidate))
         MIN_STAKE.should.be.bignumber.equal(await consensus.delegatedAmount(delegator, secondCandidate))
         // pendingValidators should be updated
-        let pendingValidators = await consensus.getPendingValidators()
+        let pendingValidators = await consensus.pendingValidators()
         pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal([secondCandidate])
       })
@@ -890,14 +849,11 @@ contract.skip('Consensus', async (accounts) => {
         // withdraw
         await consensus.methods['withdraw(address,uint256)'](firstCandidate, MIN_STAKE, {from: delegator})
         let expectedAmount = toWei(toBN(MIN_STAKE_AMOUNT * (MULTIPLY_AMOUNT - 1)), 'ether')
-        let expectedValidators = []
+        let expectedValidators = [firstCandidate]
         expectedAmount.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
-        for (let i = 0; i < MULTIPLY_AMOUNT - 1; i++) {
-          expectedValidators.push(firstCandidate)
-        }
         // pendingValidators should be updated
-        let pendingValidators = await consensus.getPendingValidators()
-        pendingValidators.length.should.be.equal(MULTIPLY_AMOUNT - 1)
+        let pendingValidators = await consensus.pendingValidators()
+        pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal(expectedValidators)
       })
       it('can withdraw multiple times', async () => {
@@ -906,24 +862,17 @@ contract.skip('Consensus', async (accounts) => {
         // withdraw 1st time
         await consensus.methods['withdraw(address,uint256)'](firstCandidate, MIN_STAKE, {from: delegator})
         let expectedAmount = toWei(toBN(MIN_STAKE_AMOUNT * (MULTIPLY_AMOUNT - 1)), 'ether')
-        let expectedValidators = []
+        let expectedValidators = [firstCandidate]
         expectedAmount.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
-        for (let i = 0; i < MULTIPLY_AMOUNT - 1; i++) {
-          expectedValidators.push(firstCandidate)
-        }
-        let pendingValidators = await consensus.getPendingValidators()
-        pendingValidators.length.should.be.equal(MULTIPLY_AMOUNT - 1)
+        let pendingValidators = await consensus.pendingValidators()
+        pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal(expectedValidators)
         // withdraw 2nd time
         await consensus.methods['withdraw(address,uint256)'](firstCandidate, MIN_STAKE, {from: delegator})
         expectedAmount = toWei(toBN(MIN_STAKE_AMOUNT * (MULTIPLY_AMOUNT - 2)), 'ether')
-        expectedValidators = []
         expectedAmount.should.be.bignumber.equal(await web3.eth.getBalance(consensus.address))
-        for (let i = 0; i < MULTIPLY_AMOUNT - 2; i++) {
-          expectedValidators.push(firstCandidate)
-        }
-        pendingValidators = await consensus.getPendingValidators()
-        pendingValidators.length.should.be.equal(MULTIPLY_AMOUNT - 2)
+        pendingValidators = await consensus.pendingValidators()
+        pendingValidators.length.should.be.equal(1)
         pendingValidators.should.deep.equal(expectedValidators)
       })
     })

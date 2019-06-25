@@ -88,7 +88,7 @@ contract ConsensusUtils is EternalStorage, ValidatorSet {
 
     _stakeAmountAdd(_staker, _amount);
 
-    if (stakeAmount(_staker) >= getMinStake()) {
+    if (stakeAmount(_staker) >= getMinStake() && !isPendingValidator(_staker)) {
       _pendingValidatorsAdd(_staker);
     }
   }
@@ -101,7 +101,7 @@ contract ConsensusUtils is EternalStorage, ValidatorSet {
     _delegatedAmountAdd(_staker, _validator, _amount);
     _stakeAmountAdd(_validator, _amount);
 
-    if (stakeAmount(_validator) >= getMinStake()) {
+    if (stakeAmount(_validator) >= getMinStake() && !isPendingValidator(_validator)) {
       _pendingValidatorsAdd(_validator);
     }
   }
@@ -277,6 +277,15 @@ contract ConsensusUtils is EternalStorage, ValidatorSet {
 
   function pendingValidatorsAtPosition(uint256 _p) public view returns(address) {
     return addressArrayStorage[PENDING_VALIDATORS][_p];
+  }
+
+  function isPendingValidator(address _address) public view returns(bool) {
+    for (uint256 i; i < pendingValidatorsLength(); i++) {
+      if (_address == pendingValidatorsAtPosition(i)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   function _setPendingValidatorsAtPosition(uint256 _p, address _address) internal {
