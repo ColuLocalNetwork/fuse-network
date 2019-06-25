@@ -16,7 +16,7 @@ const MULTIPLE_MIN_STAKE = toWei(toBN(MIN_STAKE_AMOUNT * MULTIPLY_AMOUNT), 'ethe
 const CYCLE_DURATION_BLOCKS = 100
 const SNAPSHOTS_PER_CYCLE = 10
 
-contract('Consensus', async (accounts) => {
+contract.skip('Consensus', async (accounts) => {
   let consensusImpl, proxy, consensus
   let owner = accounts[0]
   let nonOwner = accounts[1]
