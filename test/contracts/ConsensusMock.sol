@@ -11,8 +11,12 @@ contract ConsensusMock is Consensus {
     addressArrayStorage[NEW_VALIDATOR_SET] = _newSet;
   }
 
-  function setSnapshotMock(uint256 _snapshotId, address[] _addresses) public {
-    addressArrayStorage[keccak256(abi.encodePacked("snapshot", _snapshotId))] = _addresses;
+  function setSnapshotMock(uint256 _snapshotId, address[] _addresses, uint256[] _amounts) public {
+    _setSnapshotAddresses(_snapshotId, _addresses);
+    for (uint256 i; i < _addresses.length; i++) {
+      uintStorage[keccak256(abi.encodePacked("stakeAmount", _addresses[i]))] = _amounts[i];
+      _setSnapshotStakeAmountForAddress(_snapshotId, _addresses[i]);
+    }
   }
 
   function setSnapshotsPerCycleMock(uint256 _snapshotsPerCycle) public {

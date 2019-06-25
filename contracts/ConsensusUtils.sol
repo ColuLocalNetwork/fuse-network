@@ -106,24 +106,36 @@ contract ConsensusUtils is EternalStorage, ValidatorSet {
     }
   }
 
-  function _getValidatorSetFromSnapshot(uint256 _snapshotId) internal view returns(address[]) {
+  function getValidatorSetFromSnapshot(uint256 _snapshotId) public view returns(address[]) {
+    address[] memory empty = new address[](0);
     address[] memory addresses = getSnapshotAddresses(_snapshotId);
+    if (addresses.length == 0) {
+      return empty;
+    }
+
     uint256[] memory stakeAmounts = new uint256[](addresses.length);
     uint256 totalStakeAmount;
     for (uint256 i = 0; i < addresses.length; i++) {
       stakeAmounts[i] = getSnapshotStakeAmountForAddress(_snapshotId, addresses[i]);
       totalStakeAmount = totalStakeAmount.add(stakeAmounts[i]);
     }
-    uint256 slotAmount = VALIDATOR_SLOTS.mul(DECIMALS).mul(DECIMALS).div(totalStakeAmount);
+    if (totalStakeAmount == 0) {
+      return empty;
+    }
+
+    uint256 slotAmount = (VALIDATOR_SLOTS.mul(DECIMALS.mul(DECIMALS))).div(totalStakeAmount);
     uint256[] memory slots = new uint256[](addresses.length);
     address[] memory result = new address[](VALIDATOR_SLOTS); // TODO shuffle the array
     uint256 index = 0;
-    for (uint256 j = 0; i < addresses.length; i++) {
-      slots[i] = slotAmount.mul(stakeAmounts[i]).div(DECIMALS).div(DECIMALS);
-      for (uint256 k = 0; k < slots[i]; k++) {
-        result[index.add(k)] = addresses[j];
+    for (uint256 j = 0; j < addresses.length; j++) {
+      slots[j] = (slotAmount.mul(stakeAmounts[j])).div(DECIMALS.mul(DECIMALS));
+      for (uint256 k = 0; k < slots[j]; k++) {
+        result[index] = addresses[j];
+        index++;
       }
-      index = k;
+    }
+    for (uint256 l = index; l < VALIDATOR_SLOTS; l++) {
+      result[l] = result[getRandom(0, index)];
     }
     return result;
   }

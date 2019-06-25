@@ -126,7 +126,10 @@ contract Consensus is ConsensusUtils {
     if (hasCycleEnded()) {
       IVoting(ProxyStorage(getProxyStorage()).getVoting()).onCycleEnd(currentValidators());
       uint256 randomSnapshotId = getRandom(0, getSnapshotsPerCycle() - 1);
-      _setNewValidatorSet(_getValidatorSetFromSnapshot(randomSnapshotId));
+      address[] memory newSet = getValidatorSetFromSnapshot(randomSnapshotId);
+      if (newSet.length > 0) {
+        _setNewValidatorSet(newSet);
+      }
       if (newValidatorSetLength() > 0) {
         _setFinalized(false);
         _setShouldEmitInitiateChange(true);
