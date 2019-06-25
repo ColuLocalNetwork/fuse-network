@@ -599,16 +599,20 @@ contract('Consensus', async (accounts) => {
       set.length.should.be.equal(0)
       set.should.deep.equal([])
       let addresses = [accounts[1], accounts[2], accounts[3]]
-      let amounts = [MIN_STAKE, MIN_STAKE, MULTIPLE_MIN_STAKE]
-      await consensus.setSnapshotMock(id, addresses, amounts)
+      let amountsWei = [MULTIPLE_MIN_STAKE, MIN_STAKE, MULTIPLE_MIN_STAKE]
+      let amounts = [MIN_STAKE_AMOUNT * MULTIPLY_AMOUNT, MIN_STAKE_AMOUNT, MIN_STAKE_AMOUNT * MULTIPLY_AMOUNT]
+      let totalAmount = amounts.reduce((a,b) => a + b, 0)
+      // console.log('totalAmount', totalAmount)
+      let slots = (await consensus.VALIDATOR_SLOTS()).toNumber()
+      let appearences = {}
+      appearences[addresses[0]] = Math.floor(slots / totalAmount * amounts[0])
+      appearences[addresses[1]] = Math.floor(slots / totalAmount * amounts[1])
+      appearences[addresses[2]] = Math.floor(slots / totalAmount * amounts[2])
+      // console.log('appearences', appearences)
+      await consensus.setSnapshotMock(id, addresses, amountsWei)
       set = await consensus.getValidatorSetFromSnapshot(id)
       // console.log('set', set)
       toBN(set.length).should.be.bignumber.equal(await consensus.VALIDATOR_SLOTS())
-      let slots = (await consensus.VALIDATOR_SLOTS()).toNumber()
-      let appearences = {}
-      appearences[addresses[0]] = Math.floor(slots/addresses.length)
-      appearences[addresses[1]] = Math.floor(slots/addresses.length)
-      appearences[addresses[2]] = Math.floor(slots/addresses.length)
       for (let i = 0; i < set.length; i++) {
         set[i].should.not.be.equal(ZERO_ADDRESS)
         if (appearences[set[i]] > 0) {
