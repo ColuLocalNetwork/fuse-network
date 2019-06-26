@@ -140,7 +140,11 @@ contract ConsensusUtils is EternalStorage, ValidatorSet {
     delete index;
     for (uint256 l = 0; l < VALIDATOR_SLOTS; l++) {
       if (result[l] == address(0)) {
-        result[l] = addresses[getRandom(0, addresses.length - 1)];
+        if (addresses.length == 1) {
+          result[l] = addresses[0];
+        } else {
+          result[l] = addresses[getRandom(0, addresses.length - 1)];
+        }
       }
     }
     return result;
