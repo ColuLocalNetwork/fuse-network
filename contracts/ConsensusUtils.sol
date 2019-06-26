@@ -107,10 +107,9 @@ contract ConsensusUtils is EternalStorage, ValidatorSet {
   }
 
   function getValidatorSetFromSnapshot(uint256 _snapshotId) public view returns(address[]) {
-    address[] memory empty = new address[](0);
     address[] memory addresses = getSnapshotAddresses(_snapshotId);
     if (addresses.length == 0) {
-      return empty;
+      return new address[](0);
     }
 
     uint256[] memory stakeAmounts = new uint256[](addresses.length);
@@ -120,22 +119,29 @@ contract ConsensusUtils is EternalStorage, ValidatorSet {
       totalStakeAmount = totalStakeAmount.add(stakeAmounts[i]);
     }
     if (totalStakeAmount == 0) {
-      return empty;
+      return new address[](0);
     }
 
     uint256 slotAmount = (VALIDATOR_SLOTS.mul(DECIMALS.mul(DECIMALS))).div(totalStakeAmount);
     uint256[] memory slots = new uint256[](addresses.length);
-    address[] memory result = new address[](VALIDATOR_SLOTS); // TODO shuffle the array
+    address[] memory result = new address[](VALIDATOR_SLOTS);
     uint256 index = 0;
     for (uint256 j = 0; j < addresses.length; j++) {
       slots[j] = (slotAmount.mul(stakeAmounts[j])).div(DECIMALS.mul(DECIMALS));
       for (uint256 k = 0; k < slots[j]; k++) {
-        result[index] = addresses[j];
+        if (index.mod(addresses.length) == 0) {
+          result[index] = addresses[j];
+        } else {
+          result[VALIDATOR_SLOTS.sub(index).sub(1)] = addresses[j];
+        }
         index++;
       }
     }
-    for (uint256 l = index; l < VALIDATOR_SLOTS; l++) {
-      result[l] = result[getRandom(0, index)];
+    delete index;
+    for (uint256 l = 0; l < VALIDATOR_SLOTS; l++) {
+      if (result[l] == address(0)) {
+        result[l] = addresses[getRandom(0, addresses.length - 1)];
+      }
     }
     return result;
   }
