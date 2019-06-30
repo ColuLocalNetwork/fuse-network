@@ -12,6 +12,8 @@ import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 contract BlockReward is EternalStorage, BlockRewardBase {
   using SafeMath for uint256;
 
+  uint256 public constant DECIMALS = 10 ** 18;
+
   /**
   * @dev This event will be emitted every block, describing the rewards given
   * @param receivers array of addresses to reward
@@ -40,11 +42,13 @@ contract BlockReward is EternalStorage, BlockRewardBase {
   * @param _supply initial total supply
   * @param _inflation yearly inflation rate (percentage)
   */
-  function initialize(uint256 _supply, uint256 _inflation) external onlyOwner {
+  function initialize(uint256 _supply, uint256 _blocksPerYear, uint256 _inflation) external onlyOwner {
     require(!isInitialized());
     _setSystemAddress(0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE);
     _setTotalSupply(_supply);
+    _setBlocksPerYear(_blocksPerYear);
     _setInflation(_inflation);
+    _setBlockRewardAmount();
     setInitialized(true);
   }
 
@@ -64,13 +68,16 @@ contract BlockReward is EternalStorage, BlockRewardBase {
     address[] memory receivers = new address[](benefactors.length);
     uint256[] memory rewards = new uint256[](receivers.length);
 
-    uint256 blockReward = getReward();
+    if ((block.number).mod(getBlocksPerYear()) == 0) {
+      _setBlockRewardAmount();
+    }
 
-    _setTotalSupply(getTotalSupply().add(blockReward));
+    uint256 blockRewardAmount = getBlockRewardAmount();
+
+    _setTotalSupply(getTotalSupply().add(blockRewardAmount));
 
     receivers[0] = benefactors[0];
-    rewards[0] = blockReward;
-
+    rewards[0] = blockRewardAmount;
     emit Rewarded(receivers, rewards);
 
     return (receivers, rewards);
@@ -81,6 +88,8 @@ contract BlockReward is EternalStorage, BlockRewardBase {
   bytes32 internal constant PROXY_STORAGE = keccak256(abi.encodePacked("proxyStorage"));
   bytes32 internal constant TOTAL_SUPPLY = keccak256(abi.encodePacked("totalSupply"));
   bytes32 internal constant INFLATION = keccak256(abi.encodePacked("inflation"));
+  bytes32 internal constant BLOCKS_PER_YEAR = keccak256(abi.encodePacked("blocksPerYear"));
+  bytes32 internal constant BLOCK_REWARD_AMOUNT = keccak256(abi.encodePacked("blockRewardAmount"));
 
   function _setSystemAddress(address _newAddress) private {
     addressStorage[SYSTEM_ADDRESS] = _newAddress;
@@ -108,9 +117,20 @@ contract BlockReward is EternalStorage, BlockRewardBase {
     return uintStorage[INFLATION];
   }
 
-  function getReward() public view returns(uint256) {
-    // TODO
-    return 0;
+  function _setBlocksPerYear(uint256 _blocksPerYear) private {
+    uintStorage[BLOCKS_PER_YEAR] = _blocksPerYear;
+  }
+
+  function getBlocksPerYear() public view returns(uint256) {
+    return uintStorage[BLOCKS_PER_YEAR];
+  }
+
+  function _setBlockRewardAmount() private {
+    uintStorage[BLOCK_REWARD_AMOUNT] = (getTotalSupply().mul(getInflation().mul(DECIMALS).div(100))).div(getBlocksPerYear()).div(DECIMALS);
+  }
+
+  function getBlockRewardAmount() public view returns(uint256) {
+    return uintStorage[BLOCK_REWARD_AMOUNT];
   }
 
   function getProxyStorage() public view returns(address) {

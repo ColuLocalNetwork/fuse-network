@@ -18,6 +18,7 @@ const {
   CYCLE_DURATION_BLOCKS,
   SNAPSHOTS_PER_CYCLE,
   INITIAL_SUPPLY_GWEI,
+  BLOCKS_PER_YEAR,
   YEARLY_INFLATION_PERCENTAGE,
   MIN_BALLOT_DURATION_CYCLES,
   SAVE_TO_FILE
@@ -30,6 +31,7 @@ module.exports = function(deployer, network, accounts) {
     let cycleDurationBlocks = CYCLE_DURATION_BLOCKS || 17280
     let snapshotsPerCycle = SNAPSHOTS_PER_CYCLE || 10
     let initialSupply = toWei(toBN(INITIAL_SUPPLY_GWEI || 0), 'gwei')
+    let blocksPerYear = BLOCKS_PER_YEAR || 6307200
     let yearlyInflationPercentage = YEARLY_INFLATION_PERCENTAGE || 0
     let minBallotDurationCycles = MIN_BALLOT_DURATION_CYCLES || 2
 
@@ -57,7 +59,7 @@ module.exports = function(deployer, network, accounts) {
       blockRewardImpl = await BlockReward.new()
       proxy = await EternalStorageProxy.new(proxyStorage.address, blockRewardImpl.address)
       blockReward = await BlockReward.at(proxy.address)
-      await blockReward.initialize(initialSupply, yearlyInflationPercentage)
+      await blockReward.initialize(initialSupply, blocksPerYear, yearlyInflationPercentage)
 
       // Voting
       votingImpl = await Voting.new()
