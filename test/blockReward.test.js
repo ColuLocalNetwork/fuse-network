@@ -95,8 +95,39 @@ contract('BlockReward', async (accounts) => {
       let expectedSupply = initialSupply.add(blockRewardAmount)
       expectedSupply.should.be.bignumber.equal(await blockReward.getTotalSupply())
     })
-    it('reward should update each year, and total yearly inflation should be calculated correctly', async () => {
-      // TODO
+    it('reward amount should update after BLOCKS_PER_YEAR and total yearly inflation should be calculated correctly', async () => {
+      let BLOCKS_PER_YEAR_MOCK = 3
+      await blockReward.setSystemAddressMock(mockSystemAddress, {from: owner})
+      await blockReward.initializeMock(INITIAL_SUPPLY, BLOCKS_PER_YEAR_MOCK, YEARLY_INFLATION_PERCENTAGE)
+
+      let decimals = await blockReward.DECIMALS()
+      let initialSupply = await blockReward.getTotalSupply()
+      let blocksPerYear = await blockReward.getBlocksPerYear()
+      let inflation = await blockReward.getInflation()
+      let blockRewardAmount = await blockReward.getBlockRewardAmount()
+      // console.log(`initialSupply: ${initialSupply.div(decimals).toNumber()}, blockRewardAmount: ${blockRewardAmount.div(decimals).toNumber()}`)
+
+      // each of the following calls advances a block
+      let i = 0
+      let blockNumber = await web3.eth.getBlockNumber()
+      while (blockNumber % BLOCKS_PER_YEAR_MOCK !== 0) {
+        // console.log('block #', blockNumber)
+        await blockReward.reward([accounts[3]], [0], {from: mockSystemAddress}).should.be.fulfilled
+        blockNumber = await web3.eth.getBlockNumber()
+        i++
+      }
+      // console.log('i', i)
+
+      let totalSupply = await blockReward.getTotalSupply()
+      let newBlockRewardAmount = await blockReward.getBlockRewardAmount()
+      // console.log(`totalSupply: ${totalSupply.div(decimals).toNumber()}, newBlockRewardAmount: ${newBlockRewardAmount.div(decimals).toNumber()}`)
+      let expectedSupply = initialSupply
+      for (let j = 0; j < i; j++) {
+        expectedSupply = expectedSupply.add(blockRewardAmount)
+      }
+      // console.log(`expectedSupply: ${expectedSupply.div(decimals).toNumber()}`)
+      totalSupply.should.be.bignumber.equal(expectedSupply)
+      newBlockRewardAmount.should.be.bignumber.equal((totalSupply.mul(decimals).mul(inflation).div(toBN(100))).div(blocksPerYear).div(decimals))
     })
   })
 

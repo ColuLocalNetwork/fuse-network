@@ -68,10 +68,6 @@ contract BlockReward is EternalStorage, BlockRewardBase {
     address[] memory receivers = new address[](benefactors.length);
     uint256[] memory rewards = new uint256[](receivers.length);
 
-    if ((block.number).mod(getBlocksPerYear()) == 0) {
-      _setBlockRewardAmount();
-    }
-
     uint256 blockRewardAmount = getBlockRewardAmount();
 
     _setTotalSupply(getTotalSupply().add(blockRewardAmount));
@@ -79,6 +75,10 @@ contract BlockReward is EternalStorage, BlockRewardBase {
     receivers[0] = benefactors[0];
     rewards[0] = blockRewardAmount;
     emit Rewarded(receivers, rewards);
+
+    if ((block.number).mod(getBlocksPerYear()) == 0) {
+      _setBlockRewardAmount();
+    }
 
     return (receivers, rewards);
   }
