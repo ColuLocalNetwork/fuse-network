@@ -793,13 +793,24 @@ contract('Consensus', async (accounts) => {
       // console.log('randomSnapshotId', randomSnapshotId)
       randomSet = await consensus.getValidatorSetFromSnapshot(randomSnapshotId)
       // console.log('randomSet', randomSet)
+      appearences = {}
+      for(let i = 0; i < randomSet.length; i++) {
+        appearences[randomSet[i]] = appearences[randomSet[i]] || 0
+        appearences[randomSet[i]]++
+      }
 
       // call cycle function
       tx = await consensus.cycle({from: owner}).should.be.fulfilled
       true.should.be.equal(await consensus.shouldEmitInitiateChange())
       tx.logs.length.should.be.equal(1)
       tx.logs[0].event.should.be.equal('ShouldEmitInitiateChange')
-      randomSet.should.be.deep.equal(await consensus.newValidatorSet())
+      let newValidatorSet = await consensus.newValidatorSet()
+      for(let i = 0; i < newValidatorSet.length; i++) {
+        appearences[newValidatorSet[i]]--
+      }
+      Object.keys(appearences).forEach(k => {
+        appearences[k].should.be.equal(0)
+      })
 
       // call finalizeChange
       tx = await consensus.finalizeChange().should.be.fulfilled
