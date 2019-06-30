@@ -37,12 +37,14 @@ contract BlockReward is EternalStorage, BlockRewardBase {
 
   /**
   * @dev Function to be called on contract initialization
-  * @param _reward block reward amount on each block
+  * @param _supply initial total supply
+  * @param _inflation yearly inflation rate (percentage)
   */
-  function initialize(uint256 _reward) external onlyOwner {
+  function initialize(uint256 _supply, uint256 _inflation) external onlyOwner {
     require(!isInitialized());
     _setSystemAddress(0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE);
-    _setReward(_reward);
+    _setTotalSupply(_supply);
+    _setInflation(_inflation);
     setInitialized(true);
   }
 
@@ -62,8 +64,12 @@ contract BlockReward is EternalStorage, BlockRewardBase {
     address[] memory receivers = new address[](benefactors.length);
     uint256[] memory rewards = new uint256[](receivers.length);
 
+    uint256 blockReward = getReward();
+
+    _setTotalSupply(getTotalSupply().add(blockReward));
+
     receivers[0] = benefactors[0];
-    rewards[0] = getReward();
+    rewards[0] = blockReward;
 
     emit Rewarded(receivers, rewards);
 
@@ -73,7 +79,8 @@ contract BlockReward is EternalStorage, BlockRewardBase {
   bytes32 internal constant OWNER = keccak256(abi.encodePacked("owner"));
   bytes32 internal constant SYSTEM_ADDRESS = keccak256(abi.encodePacked("SYSTEM_ADDRESS"));
   bytes32 internal constant PROXY_STORAGE = keccak256(abi.encodePacked("proxyStorage"));
-  bytes32 internal constant REWARD = keccak256(abi.encodePacked("reward"));
+  bytes32 internal constant TOTAL_SUPPLY = keccak256(abi.encodePacked("totalSupply"));
+  bytes32 internal constant INFLATION = keccak256(abi.encodePacked("inflation"));
 
   function _setSystemAddress(address _newAddress) private {
     addressStorage[SYSTEM_ADDRESS] = _newAddress;
@@ -83,13 +90,27 @@ contract BlockReward is EternalStorage, BlockRewardBase {
     return addressStorage[SYSTEM_ADDRESS];
   }
 
-  function _setReward(uint256 _reward) private {
-    require(_reward >= 0);
-    uintStorage[REWARD] = _reward;
+  function _setTotalSupply(uint256 _supply) private {
+    require(_supply >= 0);
+    uintStorage[TOTAL_SUPPLY] = _supply;
+  }
+
+  function getTotalSupply() public view returns(uint256) {
+    return uintStorage[TOTAL_SUPPLY];
+  }
+
+  function _setInflation(uint256 _inflation) private {
+    require(_inflation >= 0);
+    uintStorage[INFLATION] = _inflation;
+  }
+
+  function getInflation() public view returns(uint256) {
+    return uintStorage[INFLATION];
   }
 
   function getReward() public view returns(uint256) {
-    return uintStorage[REWARD];
+    // TODO
+    return 0;
   }
 
   function getProxyStorage() public view returns(address) {
