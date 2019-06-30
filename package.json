@@ -7,7 +7,8 @@
     "test": "scripts/test.sh",
     "compile": "truffle compile",
     "abi": "scripts/abi.sh",
-    "flatten": "scripts/flatten.sh"
+    "flatten": "scripts/flatten.sh",
+    "app": "node app/index.js"
   },
   "author": "Lior Rabin",
   "license": "MIT",
