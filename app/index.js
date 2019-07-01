@@ -6,10 +6,11 @@ const HDWalletProvider = require('truffle-hdwallet-provider')
 const EthWallet = require('ethereumjs-wallet')
 const Web3 = require('web3')
 
-const web3 = new Web3(process.env.RPC)
 const configDir = path.join(cwd, process.env.CONFIG_DIR || 'config/')
 
+let web3
 let walletProvider
+let account
 let consensus
 
 function initWalletProvider() {
@@ -28,7 +29,9 @@ function initWalletProvider() {
   if (!walletProvider) {
     throw new Error(`Could not set walletProvider for unknown reason`)
   } else {
-    logger.info(`walletProvider`, walletProvider.addresses[0])
+    account = walletProvider.addresses[0]
+    logger.info(`account: ${account}`)
+    web3 = new Web3(walletProvider)
   }
 }
 

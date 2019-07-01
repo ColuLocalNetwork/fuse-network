@@ -3,10 +3,9 @@
 build
 flats
 abis
-config/keys
-config/pass.pwd
-database
+fusenet
 contracts.json
+runlocal.txt
 
 # Logs
 logs
@@ -71,4 +70,3 @@ typings/
 
 # next.js build output
 .next
-fusenet
