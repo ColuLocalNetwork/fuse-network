@@ -40,9 +40,30 @@ function initConsensusContract() {
   consensus = new web3.eth.Contract(require(path.join(cwd, 'abi/consensus')), process.env.CONSENSUS_ADDRESS)
 }
 
-async function emitInitiateChange() {
-  logger.info(`emitInitiateChange`)
-  // TODO
+function emitInitiateChange() {
+  return new Promise(async (resolve, reject) => {
+    logger.info(`emitInitiateChange`)
+    let currentBlockNumber = await web3.eth.getBlockNumber()
+    let currentCycleEndBlock = await consensus.methods.getCurrentCycleEndBlock.call()
+    let shouldEmitInitiateChange = await consensus.methods.shouldEmitInitiateChange.call()
+    logger.info(`block #${currentBlockNumber}\n\tcurrentCycleEndBlock: ${currentCycleEndBlock}\n\tshouldEmitInitiateChange: ${shouldEmitInitiateChange}`)
+    if (shouldEmitInitiateChange) {
+      let nonce = await web3.eth.getTransactionCount(account)
+      logger.debug(`nonce: ${nonce}`)
+      consensus.methods.emitInitiateChange().send({ from: account })
+      .on('transactionHash', hash => {
+        logger.debug(`transactionHash: ${hash}`)
+      })
+      .on('confirmation', (confirmationNumber, receipt) => {
+        if (confirmationNumber == 1) {
+          logger.debug(`receipt: ${JSON.stringify(receipt)}`)
+        }
+        resolve()
+      })
+    } else {
+      resolve()
+    }
+  })
 }
 
 async function runMain() {
