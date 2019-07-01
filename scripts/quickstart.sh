@@ -219,6 +219,7 @@ function startNode {
       $PERMISSION_PREFIX docker run \
         --detach \
         --name $DOCKER_CONTAINER_APP \
+        --volume $CONFIG_DIR:/config \
         --restart=on-failure \
         $DOCKER_IMAGE_APP
       ;;
