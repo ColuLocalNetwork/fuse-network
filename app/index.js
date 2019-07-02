@@ -50,7 +50,10 @@ function emitInitiateChange() {
     if (shouldEmitInitiateChange) {
       let nonce = await web3.eth.getTransactionCount(account)
       logger.debug(`nonce: ${nonce}`)
-      consensus.methods.emitInitiateChange().send({ from: account })
+      consensus.methods.emitInitiateChange().send({
+        from: account,
+        gasPrice: 0
+      })
       .on('transactionHash', hash => {
         logger.debug(`transactionHash: ${hash}`)
       })
@@ -58,6 +61,10 @@ function emitInitiateChange() {
         if (confirmationNumber == 1) {
           logger.debug(`receipt: ${JSON.stringify(receipt)}`)
         }
+        resolve()
+      })
+      .on('error', error => {
+        logger.error(`error: ${error}`)
         resolve()
       })
     } else {

@@ -3,7 +3,7 @@
 build
 flats
 abis
-fusenet
+fusenet*
 contracts.json
 runlocal.txt
 
