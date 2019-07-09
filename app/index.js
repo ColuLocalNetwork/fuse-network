@@ -48,7 +48,7 @@ function emitInitiateChange() {
     let shouldEmitInitiateChange = await consensus.methods.shouldEmitInitiateChange.call()
     logger.info(`block #${currentBlockNumber}\n\tcurrentCycleEndBlock: ${currentCycleEndBlock}\n\tshouldEmitInitiateChange: ${shouldEmitInitiateChange}`)
     if (shouldEmitInitiateChange) {
-      let count = await consensus.methods.getEmitInitiateChangeCount.call()
+      let count = await consensus.methods.getEmitInitiateChangeCount(account).call()
       logger.info(`${account} need to emitInitiateChange ${count} times`)
       if (count > 0) {
         logger.info(`${account} sending 1 of ${count} emitInitiateChange transactions`)

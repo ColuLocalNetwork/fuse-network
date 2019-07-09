@@ -383,11 +383,11 @@ contract ConsensusUtils is EternalStorage, ValidatorSet {
   }
 
   function _shouldPrepareForCycleEnd() internal view returns(bool) {
-    return (block.number > getCurrentCycleEndBlock().sub(VALIDATOR_SLOTS.div(2).add(1)));
+    return (block.number == getCurrentCycleEndBlock().sub(VALIDATOR_SLOTS.div(2).add(1)));
   }
 
   function _hasCycleEnded() internal view returns(bool) {
-    return (block.number > getCurrentCycleEndBlock());
+    return (block.number == getCurrentCycleEndBlock());
   }
 
   function getRandom(uint256 _from, uint256 _to) public view returns(uint256) {
