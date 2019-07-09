@@ -48,26 +48,15 @@ function emitInitiateChange() {
     let shouldEmitInitiateChange = await consensus.methods.shouldEmitInitiateChange.call()
     logger.info(`block #${currentBlockNumber}\n\tcurrentCycleEndBlock: ${currentCycleEndBlock}\n\tshouldEmitInitiateChange: ${shouldEmitInitiateChange}`)
     if (shouldEmitInitiateChange) {
-      let nonce = await web3.eth.getTransactionCount(account)
-      logger.debug(`nonce: ${nonce}`)
-      consensus.methods.emitInitiateChange().send({
-        from: account,
-        gas: 1000000,
-        gasPrice: 0
-      })
-      .on('transactionHash', hash => {
-        logger.debug(`transactionHash: ${hash}`)
-      })
-      .on('confirmation', (confirmationNumber, receipt) => {
-        if (confirmationNumber == 1) {
-          logger.debug(`receipt: ${JSON.stringify(receipt)}`)
-        }
-        resolve()
-      })
-      .on('error', error => {
-        logger.error(`error: ${JSON.stringify(error)}`)
-        resolve()
-      })
+      let count = await consensus.methods.getEmitInitiateChangeCount.call()
+      logger.info(`${account} need to emitInitiateChange ${count} times`)
+      if (count > 0) {
+        logger.info(`${account} sending 1 of ${count} emitInitiateChange transactions`)
+        consensus.methods.emitInitiateChange().send({ from: account, gas: 1000000, gasPrice: 0 })
+          .on('transactionHash', hash => { logger.info(`transactionHash: ${hash}`) })
+          .on('confirmation', (confirmationNumber, receipt) => { if (confirmationNumber == 1) logger.debug(`receipt: ${JSON.stringify(receipt)}`); resolve() })
+          .on('error', error => { logger.error(error); resolve() })
+      }
     } else {
       resolve()
     }

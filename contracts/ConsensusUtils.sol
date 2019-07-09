@@ -37,7 +37,7 @@ contract ConsensusUtils is EternalStorage, ValidatorSet {
   * @dev This modifier verifies that msg.sender is the system address (EIP96)
   */
   modifier onlySystem() {
-    require(msg.sender == getSystemAddress());
+    require(msg.sender == addressStorage[SYSTEM_ADDRESS]);
     _;
   }
 
@@ -106,7 +106,7 @@ contract ConsensusUtils is EternalStorage, ValidatorSet {
     }
   }
 
-  function getValidatorSetFromSnapshot(uint256 _snapshotId) public view returns(address[]) {
+  function _getValidatorSetFromSnapshot(uint256 _snapshotId) internal view returns(address[]) {
     address[] memory addresses = getSnapshotAddresses(_snapshotId);
     if (addresses.length == 0) {
       return new address[](0);
@@ -152,10 +152,6 @@ contract ConsensusUtils is EternalStorage, ValidatorSet {
 
   function _setSystemAddress(address _newAddress) internal {
     addressStorage[SYSTEM_ADDRESS] = _newAddress;
-  }
-
-  function getSystemAddress() public view returns(address) {
-    return addressStorage[SYSTEM_ADDRESS];
   }
 
   function setProxyStorage(address _newAddress) external onlyOwner {
@@ -282,7 +278,7 @@ contract ConsensusUtils is EternalStorage, ValidatorSet {
   }
 
   function _currentValidatorsAdd(address _address) internal {
-      addressArrayStorage[CURRENT_VALIDATORS].push(_address);
+    addressArrayStorage[CURRENT_VALIDATORS].push(_address);
   }
 
   function _setCurrentValidators(address[] _currentValidators) internal {
@@ -382,15 +378,31 @@ contract ConsensusUtils is EternalStorage, ValidatorSet {
     return getCycleDurationBlocks().div(getSnapshotsPerCycle());
   }
 
-  function shouldTakeSnapshot() public view returns(bool) {
+  function _shouldTakeSnapshot() internal view returns(bool) {
     return (block.number - getLastSnapshotTakenAtBlock() >= getBlocksToSnapshot());
   }
 
-  function hasCycleEnded() public view returns(bool) {
+  function _shouldPrepareForCycleEnd() internal view returns(bool) {
+    return (block.number > getCurrentCycleEndBlock().sub(VALIDATOR_SLOTS.div(2).add(1)));
+  }
+
+  function _hasCycleEnded() internal view returns(bool) {
     return (block.number > getCurrentCycleEndBlock());
   }
 
   function getRandom(uint256 _from, uint256 _to) public view returns(uint256) {
     return uint256(keccak256(abi.encodePacked(blockhash(block.number - 1)))).mod(_to).add(_from);
+  }
+
+  function _emitInitiateChangeCountAdd(address _address, uint256 _amount) internal {
+    uintStorage[keccak256(abi.encodePacked("emitInitiateChangeCount", _address))] = uintStorage[keccak256(abi.encodePacked("emitInitiateChangeCount", _address))].add(_amount);
+  }
+
+  function _emitInitiateChangeCountSub(address _address, uint256 _amount) internal {
+    uintStorage[keccak256(abi.encodePacked("emitInitiateChangeCount", _address))] = uintStorage[keccak256(abi.encodePacked("emitInitiateChangeCount", _address))].sub(_amount);
+  }
+
+  function getEmitInitiateChangeCount(address _address) public view returns(uint256) {
+    return uintStorage[keccak256(abi.encodePacked("emitInitiateChangeCount", _address))].div(2).add(1);
   }
 }

@@ -67,34 +67,6 @@
   },
   {
     "constant": true,
-    "inputs": [],
-    "name": "shouldTakeSnapshot",
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "payable": false,
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "constant": true,
-    "inputs": [],
-    "name": "hasCycleEnded",
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "payable": false,
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "constant": true,
     "inputs": [
       {
         "name": "_address",
@@ -176,15 +148,15 @@
     "constant": true,
     "inputs": [
       {
-        "name": "_snapshotId",
-        "type": "uint256"
+        "name": "_address",
+        "type": "address"
       }
     ],
-    "name": "getValidatorSetFromSnapshot",
+    "name": "getEmitInitiateChangeCount",
     "outputs": [
       {
         "name": "",
-        "type": "address[]"
+        "type": "uint256"
       }
     ],
     "payable": false,
@@ -344,20 +316,6 @@
       {
         "name": "",
         "type": "bool"
-      }
-    ],
-    "payable": false,
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "constant": true,
-    "inputs": [],
-    "name": "getSystemAddress",
-    "outputs": [
-      {
-        "name": "",
-        "type": "address"
       }
     ],
     "payable": false,
