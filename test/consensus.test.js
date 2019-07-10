@@ -579,8 +579,10 @@ contract('Consensus', async (accounts) => {
     })
     it('hasCycleEnded', async () => {
       false.should.be.equal(await consensus.hasCycleEnded())
+      let currentBlockNumber = await web3.eth.getBlockNumber()
       let currentCycleEndBlock = await consensus.getCurrentCycleEndBlock()
-      await advanceBlocks(CYCLE_DURATION_BLOCKS)
+      let blocksToAdvance = currentCycleEndBlock.toNumber() - currentBlockNumber
+      await advanceBlocks(blocksToAdvance - 1)
       true.should.be.equal(await consensus.hasCycleEnded())
     })
     it('shouldTakeSnapshot', async () => {

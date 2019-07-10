@@ -125,18 +125,14 @@ contract Consensus is ConsensusUtils {
       delete snapshotId;
     }
     if (_shouldPrepareForCycleEnd()) {
-      uint256 randomSnapshotId = getRandom(0, getSnapshotsPerCycle() - 1);
+      uint256 randomSnapshotId = _getRandom(0, getSnapshotsPerCycle() - 1);
       address[] memory newSet = _getValidatorSetFromSnapshot(randomSnapshotId);
       if (newSet.length > 0) {
         _setNewValidatorSet(newSet);
       }
       if (newValidatorSetLength() > 0) {
         _setFinalized(false);
-
-        for (uint256 i; i < currentValidatorsLength(); i++) {
-          _emitInitiateChangeCountAdd(currentValidatorsAtPosition(i), 1);
-        }
-
+        _setEmitInitiateChangeCount();
         _setShouldEmitInitiateChange(true);
         emit ShouldEmitInitiateChange();
       }
@@ -154,14 +150,8 @@ contract Consensus is ConsensusUtils {
   function emitInitiateChange() external onlyValidator {
     require(shouldEmitInitiateChange());
     require(newValidatorSetLength() > 0);
-    uint256 count = getEmitInitiateChangeCount(msg.sender);
-    require(count > 0);
-
-    if (count > 1) {
-      _emitInitiateChangeCountSub(msg.sender, 2);
-    } else {
-      _emitInitiateChangeCountSub(msg.sender, 1);
-    }
+    require(getEmitInitiateChangeCount(msg.sender) > 0);
+    _subEmitInitiateChangeCount(msg.sender, 1);
     emit InitiateChange(blockhash(block.number - 1), newValidatorSet());
   }
 }
