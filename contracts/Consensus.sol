@@ -80,7 +80,7 @@ contract Consensus is ConsensusUtils {
     require(_amount <= stakeAmount(msg.sender));
 
     _stakeAmountSub(msg.sender, _amount);
-    if (stakeAmount(msg.sender) == 0) {
+    if (stakeAmount(msg.sender) < getMinStake()) {
       _pendingValidatorsRemove(msg.sender);
     }
 
@@ -102,7 +102,7 @@ contract Consensus is ConsensusUtils {
     _delegatedAmountSub(msg.sender, _validator, _amount);
 
     _stakeAmountSub(_validator, _amount);
-    if (stakeAmount(_validator) == 0) {
+    if (stakeAmount(_validator) < getMinStake()) {
       _pendingValidatorsRemove(_validator);
     }
 
