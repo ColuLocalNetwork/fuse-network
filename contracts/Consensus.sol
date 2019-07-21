@@ -53,14 +53,14 @@ contract Consensus is ConsensusUtils {
   * @dev Fallback function allowing to pay to this contract. Whoever sends funds is considered as "staking" and wanting to become a validator.
   */
   function () external payable {
-    _stake(msg.sender, msg.value);
+    _delegate(msg.sender, msg.value, msg.sender);
   }
 
   /**
   * @dev stake to become a validator.
   */
   function stake() external payable {
-    _stake(msg.sender, msg.value);
+    _delegate(msg.sender, msg.value, msg.sender);
   }
 
   /**
@@ -78,7 +78,9 @@ contract Consensus is ConsensusUtils {
   function withdraw(uint256 _amount) external {
     require(_amount > 0);
     require(_amount <= stakeAmount(msg.sender));
+    require(_amount <= delegatedAmount(msg.sender, msg.sender));
 
+    _delegatedAmountSub(msg.sender, msg.sender, _amount);
     _stakeAmountSub(msg.sender, _amount);
     if (stakeAmount(msg.sender) < getMinStake()) {
       _pendingValidatorsRemove(msg.sender);
@@ -95,12 +97,10 @@ contract Consensus is ConsensusUtils {
   function withdraw(address _validator, uint256 _amount) external {
     require(_validator != address(0));
     require(_amount > 0);
-
     require(_amount <= stakeAmount(_validator));
     require(_amount <= delegatedAmount(msg.sender, _validator));
 
     _delegatedAmountSub(msg.sender, _validator, _amount);
-
     _stakeAmountSub(_validator, _amount);
     if (stakeAmount(_validator) < getMinStake()) {
       _pendingValidatorsRemove(_validator);
